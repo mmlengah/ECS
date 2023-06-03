@@ -134,7 +134,11 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ECS.h" />
     <ClInclude Include="Game.h" />
+    <ClInclude Include="PCM.h" />
+    <ClInclude Include="PCR.h" />
+    <ClInclude Include="PCTP.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
