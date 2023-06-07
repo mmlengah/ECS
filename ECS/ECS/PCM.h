@@ -3,9 +3,12 @@
 #include <cmath>
 #include <stdexcept>
 #include <ostream>
-#include <cmath>
 #include <cassert>
 #include <emmintrin.h>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 namespace PC {
 	template <typename T>
@@ -452,30 +455,19 @@ namespace PC {
 
 		T GetValue(int row, int column) const { return matrix[row][column]; }
 
-		// I removed the SIMD implementation for brevity and compatibility.
-		// Please add it back if you need it.
-		Matrix3x3 operator*(const Matrix3x3& m) const {
-			Matrix3x3 temp;
-			__m128 aLine, bLine, rLine;
+		Matrix3x3 operator*(const Matrix3x3& other) const {
+			Matrix3x3 result;
 
-			for (int i = 0; i < 3; i++) {
-				// Load the whole row:
-				aLine = _mm_loadu_ps(&matrix[i][0]);
-				for (int j = 0; j < 3; j++) {
-					// Broadcast the element across the SIMD vector:
-					bLine = _mm_set1_ps(m.matrix[j][0]);
-					// Multiply the row by the column element:
-					rLine = _mm_mul_ps(aLine, bLine);
-
-					// Sum the result: this is the dot product:
-					rLine = _mm_hadd_ps(rLine, rLine);
-					rLine = _mm_hadd_ps(rLine, rLine);
-
-					// Store the result back into the matrix:
-					_mm_store_ss(&temp.matrix[i][j], rLine);
+			for (int i = 0; i < 3; ++i) {
+				for (int j = 0; j < 3; ++j) {
+					result.matrix[i][j] = 0;
+					for (int k = 0; k < 3; ++k) {
+						result.matrix[i][j] += matrix[i][k] * other.matrix[k][j];
+					}
 				}
 			}
-			return temp;
+
+			return result;
 		}
 
 		Matrix3x3 operator=(const Matrix3x3& m) {
@@ -600,12 +592,13 @@ namespace PC {
 					__m128 col = _mm_set_ps(m.matrix[0][j], m.matrix[1][j], m.matrix[2][j], m.matrix[3][j]);
 					__m128 res = _mm_mul_ps(row, col);
 
-					// Sum the four float values of res into a single float
-					res = _mm_hadd_ps(res, res);
-					res = _mm_hadd_ps(res, res);
+					// Manually sum the four float values of res into a single float
+					float result[4];
+					_mm_store_ps(result, res);
+					float sum = result[0] + result[1] + result[2] + result[3];
 
 					// Store the result back into temp
-					_mm_store_ss(&(temp.matrix[i][j]), res);
+					temp.matrix[i][j] = sum;
 				}
 			}
 			return temp;
