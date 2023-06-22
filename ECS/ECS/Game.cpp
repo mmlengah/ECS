@@ -1,7 +1,7 @@
 #include "Game.h"
 #include <SDL_image.h>
 
-Game::Game() : quit(false), window(nullptr), renderer(nullptr), camera(nullptr), renderingSystem(nullptr)
+Game::Game() : quit(false), window(nullptr), renderer(nullptr)
 {
     
 }
@@ -42,9 +42,8 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
         SDL_Log("Failed to create renderer: %s", SDL_GetError());
         return false;
     }
-
-    camera = std::make_unique<Camera>(PC::Vector2<float>(0, 0), PC::Vector2<int>(screenWidth, screenHeight));
-    renderingSystem = std::make_unique<RenderingSystem>(renderer);
+    
+    //add camera
 
     return true;
 }

@@ -9,7 +9,6 @@
 #include <condition_variable>
 #include <atomic>
 
-//https://chat.openai.com/share/65495b56-a1d2-48bf-b416-fea4f6ca20e9
 namespace PC {
     class ThreadPool {
     public:

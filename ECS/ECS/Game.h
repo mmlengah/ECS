@@ -21,11 +21,6 @@ private:
     bool quit;
     SDL_Window* window;
     SDL_Renderer* renderer;
-
-    std::unique_ptr<Camera> camera;
-    std::unique_ptr<RenderingSystem> renderingSystem;
-    
-
 };
 
 

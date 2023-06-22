@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <ostream>
 #include <cassert>
-#include <emmintrin.h>
+#include <initializer_list>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -114,11 +114,11 @@ namespace PC {
 		}
 
 		T dotProduct(const Vector2& v) const {
-			return x * v.x + y * v.y;
+			return static_cast<T>(x * v.x + y * v.y);
 		}
 
 		T magnitude() const {
-			return std::sqrt(x * x + y * y);
+			return static_cast<T>(std::sqrt(x * x + y * y));
 		}
 
 		Vector2 normalize() const {
@@ -137,13 +137,13 @@ namespace PC {
 			// Clamp cosAngle to the interval [-1, 1]
 			cosAngle = std::max(T(-1), std::min(T(1), cosAngle));
 			T rad = std::acos(cosAngle);
-			return rad * 180.0 / M_PI; // convert to degrees
+			return static_cast<T>((rad * 180.0 / M_PI)); // convert to degrees
 		}
 
 		Vector2 rotate(T angle) const {
-			T radian = angle * M_PI / 180.0; // convert angle to radians
-			T cosAngle = std::cos(radian);
-			T sinAngle = std::sin(radian);
+			T radian = static_cast<T>(angle * M_PI / 180.0); // convert angle to radians
+			T cosAngle = static_cast<T>(std::cos(radian));
+			T sinAngle = static_cast<T>(std::sin(radian));
 			return Vector2(x * cosAngle - y * sinAngle, x * sinAngle + y * cosAngle);
 		}
 
@@ -153,6 +153,10 @@ namespace PC {
 		}
 
 	};
+
+	// alias for Vector2<int> as Vector2int
+	using Vector2int = Vector2<int>;
+	using Vector2f = Vector2<float>;
 
 	template <typename T>
 	struct Vector3 {
@@ -208,7 +212,7 @@ namespace PC {
 
 		Vector3 operator*(const T& v) const {
 			return Vector3(x * v, y * v, z * v);
-		}		
+		}
 
 		Vector3& operator*=(const T& v) {
 			x *= v;
@@ -255,7 +259,7 @@ namespace PC {
 		}
 
 		T dotProduct(const Vector3& v) const {
-			return x * v.x + y * v.y + z * v.z;
+			return static_cast<T>(x * v.x + y * v.y + z * v.z);
 		}
 
 		Vector3 crossProduct(const Vector3& v) const {
@@ -263,7 +267,7 @@ namespace PC {
 		}
 
 		T magnitude() const {
-			return std::sqrt(x * x + y * y + z * z);
+			return static_cast<T>(std::sqrt(x * x + y * y + z * z));
 		}
 
 		Vector3<T> normalise() const {
@@ -278,17 +282,17 @@ namespace PC {
 			// Ensure magnitudes is not zero
 			assert(magnitudes != 0);
 			// Make sure the value is between -1 and 1 before taking acos to avoid NaN
-			T cosAngle = std::max(std::min(dot / magnitudes, (T)1.0), (T)-1.0);
-			T angleRad = std::acos(cosAngle);
+			T cosAngle = static_cast<T>(std::max(std::min(dot / magnitudes, (T)1.0), (T)-1.0));
+			T angleRad = static_cast<T>(std::acos(cosAngle));
 			// Convert the angle in radians to degrees
-			T angleDeg = angleRad * 180.0 / M_PI;
+			T angleDeg = static_cast<T>(angleRad * 180.0 / M_PI);
 			return angleDeg;
 		}
 
 		Vector3 rotate(const Vector3& axis, T angle) const {
-			T rad = angle * M_PI / 180;  // Convert angle to radians
-			T cosAngle = std::cos(rad);
-			T sinAngle = std::sin(rad);
+			T rad = static_cast<T>(angle * M_PI / 180);  // Convert angle to radians
+			T cosAngle = static_cast<T>(std::cos(rad));
+			T sinAngle = static_cast<T>(std::sin(rad));
 			Vector3 u = axis.normalise(); // Normalised rotation axis
 
 			// Using Rodrigues' rotation formula
@@ -302,6 +306,8 @@ namespace PC {
 		}
 	};
 
+	using Vector3int = Vector3<int>;
+	using Vector3f = Vector3<float>;
 
 	template <typename T>
 	struct Vector4 {
@@ -398,7 +404,7 @@ namespace PC {
 		}
 
 		T magnitude() const {
-			return std::sqrt(x * x + y * y + z * z + w * w);
+			return static_cast<T>(std::sqrt(x * x + y * y + z * z + w * w));
 		}
 
 		Vector4 normalise() const {
@@ -411,6 +417,9 @@ namespace PC {
 			return os;
 		}
 	};
+
+	using Vector4int = Vector4<int>;
+	using Vector4f = Vector4<float>;
 
 	template <typename T>
 	struct Matrix3x3 {
@@ -431,8 +440,8 @@ namespace PC {
 		}
 
 	public:
-		int const rows = 3;
-		int const columns = 3;
+		static const int rows = 3;
+		static const int columns = 3;
 		T matrix[3][3];
 
 		Matrix3x3(T matrix[3][3]) {
@@ -440,6 +449,18 @@ namespace PC {
 				for (int j = 0; j < columns; j++) {
 					this->matrix[i][j] = matrix[i][j];
 				}
+			}
+		}
+
+		Matrix3x3(std::initializer_list<std::initializer_list<T>> list) {
+			int i = 0;
+			for (auto& row : list) {
+				int j = 0;
+				for (auto& val : row) {
+					matrix[i][j] = val;
+					++j;
+				}
+				++i;
 			}
 		}
 
@@ -451,32 +472,43 @@ namespace PC {
 			}
 		}
 
-		void SetValue(int row, int column, T value) { matrix[row][column] = value; }
+		void SetValue(int row, int column, T value) {
+			matrix[row][column] = value;
+		}
 
-		T GetValue(int row, int column) const { return matrix[row][column]; }
+		T GetValue(int row, int column) const {
+			return matrix[row][column];
+		}
 
-		Matrix3x3 operator*(const Matrix3x3& other) const {
+		Matrix3x3 operator*(const Matrix3x3& m) const {
 			Matrix3x3 result;
 
-			for (int i = 0; i < 3; ++i) {
-				for (int j = 0; j < 3; ++j) {
-					result.matrix[i][j] = 0;
-					for (int k = 0; k < 3; ++k) {
-						result.matrix[i][j] += matrix[i][k] * other.matrix[k][j];
-					}
+			for (int i = 0; i < 3; i++) {
+				const T* aPtr = &this->matrix[i][0];
+				for (int j = 0; j < 3; j++) {
+					T sum = aPtr[0] * m.matrix[0][j]
+						+ aPtr[1] * m.matrix[1][j]
+						+ aPtr[2] * m.matrix[2][j];
+
+					result.matrix[i][j] = sum;
 				}
 			}
-
 			return result;
 		}
 
-		Matrix3x3 operator=(const Matrix3x3& m) {
-			for (int i = 0; i < rows; i++) {
-				for (int j = 0; j < columns; j++) {
-					matrix[i][j] = m.matrix[i][j];
+		bool operator==(const Matrix3x3& other) const {
+			for (int i = 0; i < rows; ++i) {
+				for (int j = 0; j < columns; ++j) {
+					if (matrix[i][j] != other.matrix[i][j]) {
+						return false;
+					}
 				}
 			}
-			return *this;
+			return true;
+		}
+
+		bool operator!=(const Matrix3x3& other) const {
+			return !(*this == other);
 		}
 
 		Matrix3x3 transpose() {
@@ -511,8 +543,8 @@ namespace PC {
 		// Create a 3x3 transformation matrix for rotation
 		static Matrix3x3 Matrix3x3FromRotation(const T& rotationAngle) {
 			Matrix3x3 temp;
-			float cosTheta = cos(rotationAngle * 3.14159f / 180.0f);
-			float sinTheta = sin(rotationAngle * 3.14159f / 180.0f);
+			float cosTheta = static_cast<float>(cos(rotationAngle * M_PI / 180.0f));
+			float sinTheta = static_cast<float>(sin(rotationAngle * M_PI / 180.0f));
 
 			temp.SetValue(0, 0, cosTheta);
 			temp.SetValue(0, 1, -sinTheta);
@@ -538,6 +570,9 @@ namespace PC {
 
 	};
 
+	using Matrix3x3int = Matrix3x3<int>;
+	using Matrix3x3f = Matrix3x3<float>;
+
 	template <typename T>
 	struct Matrix4x4 {
 	private:
@@ -562,8 +597,8 @@ namespace PC {
 			return sign * minor;
 		}
 	public:
-		int const rows = 4;
-		int const columns = 4;
+		static const int rows = 4;
+		static const int columns = 4;
 		T matrix[4][4];
 
 		Matrix4x4(T matrix[4][4]) {
@@ -573,6 +608,19 @@ namespace PC {
 				}
 			}
 		}
+
+		Matrix4x4(std::initializer_list<std::initializer_list<T>> list) {
+			int i = 0;
+			for (const auto& row : list) {
+				int j = 0;
+				for (const auto& val : row) {
+					matrix[i][j] = val;
+					++j;
+				}
+				++i;
+			}
+		}
+
 		Matrix4x4() {
 			for (int i = 0; i < rows; i++) {
 				for (int j = 0; j < columns; j++) {
@@ -580,37 +628,47 @@ namespace PC {
 				}
 			}
 		}
-		void SetValue(int row, int column, T value) { matrix[row][column] = value; }
 
-		T GetValue(int row, int column) const { return matrix[row][column]; }
-
+		// Default multiplication
 		Matrix4x4 operator*(const Matrix4x4& m) const {
-			Matrix4x4 temp;
+			Matrix4x4<T> result;
+
 			for (int i = 0; i < rows; i++) {
-				__m128 row = _mm_load_ps(matrix[i]);
+				const T* aPtr = &this->matrix[i][0];
 				for (int j = 0; j < columns; j++) {
-					__m128 col = _mm_set_ps(m.matrix[0][j], m.matrix[1][j], m.matrix[2][j], m.matrix[3][j]);
-					__m128 res = _mm_mul_ps(row, col);
+					T sum = aPtr[0] * m.matrix[0][j]
+						+ aPtr[1] * m.matrix[1][j]
+						+ aPtr[2] * m.matrix[2][j]
+						+ aPtr[3] * m.matrix[3][j];
 
-					// Manually sum the four float values of res into a single float
-					float result[4];
-					_mm_store_ps(result, res);
-					float sum = result[0] + result[1] + result[2] + result[3];
-
-					// Store the result back into temp
-					temp.matrix[i][j] = sum;
+					result.matrix[i][j] = sum;
 				}
 			}
-			return temp;
+			return result;
 		}
 
-		Matrix4x4 operator=(const Matrix4x4& m) {
-			for (int i = 0; i < rows; i++) {
-				for (int j = 0; j < columns; j++) {
-					matrix[i][j] = m.matrix[i][j];
+
+		bool operator==(const Matrix4x4& other) const {
+			for (int i = 0; i < rows; ++i) {
+				for (int j = 0; j < columns; ++j) {
+					if (matrix[i][j] != other.matrix[i][j]) {
+						return false;
+					}
 				}
 			}
-			return *this;
+			return true;
+		}
+
+		bool operator!=(const Matrix4x4& other) const {
+			return !(*this == other);
+		}
+
+		void SetValue(int row, int column, T value) {
+			matrix[row][column] = value;
+		}
+
+		T GetValue(int row, int column) const {
+			return matrix[row][column];
 		}
 
 		Matrix4x4 transpose() {
@@ -680,12 +738,12 @@ namespace PC {
 
 		static Matrix4x4 Matrix4x4FromRotation(const Vector3<T>& rotationAngles) {
 			Matrix4x4 temp;
-			float cosX = cos(rotationAngles.x * 3.14159f / 180.0f);
-			float sinX = sin(rotationAngles.x * 3.14159f / 180.0f);
-			float cosY = cos(rotationAngles.y * 3.14159f / 180.0f);
-			float sinY = sin(rotationAngles.y * 3.14159f / 180.0f);
-			float cosZ = cos(rotationAngles.z * 3.14159f / 180.0f);
-			float sinZ = sin(rotationAngles.z * 3.14159f / 180.0f);
+			float cosX = cos(rotationAngles.x * M_PI / 180.0f);
+			float sinX = sin(rotationAngles.x * M_PI / 180.0f);
+			float cosY = cos(rotationAngles.y * M_PI / 180.0f);
+			float sinY = sin(rotationAngles.y * M_PI / 180.0f);
+			float cosZ = cos(rotationAngles.z * M_PI / 180.0f);
+			float sinZ = sin(rotationAngles.z * M_PI / 180.0f);
 
 			temp.SetValue(0, 0, cosY * cosZ);
 			temp.SetValue(0, 1, cosY * sinZ);
@@ -784,4 +842,7 @@ namespace PC {
 		}
 
 	};
+
+	using Matrix4x4int = Matrix4x4<int>;
+	using Matrix4x4f = Matrix4x4<float>;
 }
