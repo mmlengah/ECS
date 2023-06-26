@@ -5,6 +5,9 @@
 #include <typeindex>
 #include <memory>
 #include <SDL.h>
+#include "PCM.h"
+
+using namespace PC;
 
 class Entity;
 class Component;
@@ -78,6 +81,58 @@ private:
     void addEntityToSystems(Entity* entity) {
         for (auto& system : systems) {
             system->tryAddEntity(entity);
+        }
+    }
+};
+
+class TransformComponent : public Component {
+public:
+    Vector2f position;
+    float rotation;
+    Vector2f scale;
+    TransformComponent(Vector2f position = Vector2f(0.0f, 0.0f), float rotation = 0.0f, Vector2f scale = Vector2f(1.0f, 1.0f)) : position(position),
+        rotation(rotation), scale(scale)
+    {}
+};
+
+class SpriteComponent : public Component {
+public:
+    SDL_Rect rect;
+    SpriteComponent(SDL_Rect rect) : rect(rect) {}
+};
+
+class RenderSystem : public System {
+public:
+    SDL_Renderer* renderer;
+
+    RenderSystem(SDL_Renderer* renderer) : renderer(renderer) {}
+
+    void update() {
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer); //error here
+
+        for (Entity* entity : entities) {
+            TransformComponent* transform = entity->getComponent<TransformComponent>();
+            SpriteComponent* sprite = entity->getComponent<SpriteComponent>();
+
+            if (transform) {
+                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+                SDL_Rect temp = sprite->rect;
+                temp.x = static_cast<int>(transform->position.x);
+                temp.y = static_cast<int>(transform->position.y);
+                temp.w = static_cast<int>(temp.w * transform->scale.x);
+                temp.h = static_cast<int>(temp.h * transform->scale.y);
+                SDL_RenderFillRect(renderer, &temp);
+                //SDL_RenderCopyEx(renderer, texture, nullptr, &temp, transform->rotation, nullptr, SDL_FLIP_NONE);
+            }
+        }
+
+        SDL_RenderPresent(renderer);
+    }
+
+    void tryAddEntity(Entity* entity) override {
+        if (entity->getComponent<TransformComponent>() && entity->getComponent<SpriteComponent>()) {
+            entities.push_back(entity);
         }
     }
 };

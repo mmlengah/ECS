@@ -19,8 +19,10 @@ private:
     void Render();
 private:
     bool quit;
-    SDL_Window* window;
-    SDL_Renderer* renderer;
+    std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> win;
+    std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)> renderer;
+    std::unique_ptr<SystemManager> systemManager;
+    RenderSystem* renderSystem;
 };
 
 
