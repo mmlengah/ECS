@@ -2,16 +2,18 @@
 #include <SDL_image.h>
 #include "ECS.h"
 
-Game::Game() : quit(false), win(nullptr, SDL_DestroyWindow), renderer(nullptr, SDL_DestroyRenderer),
-renderSystem(nullptr), cam(nullptr), player(nullptr)
+Game::Game() : quit(false), oldTime(0), currentTime(0), deltaTime(0), win(nullptr, SDL_DestroyWindow),
+renderer(nullptr, SDL_DestroyRenderer), renderSystem(nullptr), keyboardMovementSystem(nullptr), 
+cam(nullptr), player(nullptr)
 {
-    
+
 }
 
 Game::~Game()
 {
     delete renderSystem;
     delete cam;
+    delete keyboardMovementSystem;
     SDL_Quit();
 }
 
@@ -35,11 +37,14 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     systemManager = std::make_unique<SystemManager>();
 
     renderSystem = &(systemManager->registerSystem<RenderSystem>(renderer.get(), cam));
+    keyboardMovementSystem = &(systemManager->registerSystem<KeyboardMovementSystem>());
 
     player = Entity::create();
     player->addComponent<TransformComponent>(Vector2f(320, 240), 0.0f, Vector2f(2.0f, 2.0f));
     SDL_Rect a = { 0, 0, 10, 10 };
     player->addComponent<SpriteComponent>(a);
+    player->addComponent<VelocityComponent>(100, 100);
+    player->addComponent<InputComponent>();
 
     auto box = Entity::create();
     box->addComponent<TransformComponent>(Vector2f(0, 0), 0.0f, Vector2f(2.0f, 2.0f));
@@ -69,11 +74,16 @@ void Game::Run()
 
     // Game loop
     while (!quit) {
+        currentTime = SDL_GetTicks();
+        deltaTime = (currentTime - oldTime) / 1000.0f; // convert from milliseconds to seconds
+        oldTime = currentTime;
+
         // Handle events
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 quit = true;
             }
+            keyboardMovementSystem->update(event, deltaTime);
         }
 
         // Update game logic
@@ -86,6 +96,7 @@ void Game::Run()
 
 void Game::Update()
 {
+    cam->lookAt(player->getComponent<TransformComponent>()->position);
 }
 
 void Game::Render()

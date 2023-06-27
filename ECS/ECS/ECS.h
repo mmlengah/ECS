@@ -113,6 +113,24 @@ public:
     SpriteComponent(SDL_Rect rect) : rect(rect) {}
 };
 
+class VelocityComponent : public Component {
+public:
+    int dx;
+    int dy;
+
+    int dxMax;
+    int dyMax;
+
+    VelocityComponent(int dx, int dy) : dx(0), dy(0), dxMax(dx), dyMax(dy) {}
+};
+
+class InputComponent : public Component {
+public:
+    std::unordered_map<SDL_Keycode, bool> keyStates;
+
+    InputComponent() {}
+};
+
 class RenderSystem : public System {
 public:
     SDL_Renderer* renderer;
@@ -151,6 +169,65 @@ public:
 
     void tryAddEntity(Entity* entity) override {
         if (entity->getComponent<TransformComponent>() && entity->getComponent<SpriteComponent>()) {
+            entities.push_back(entity);
+        }
+    }
+};
+
+class KeyboardMovementSystem : public System {
+public:
+    void update(SDL_Event& e, float deltaTime = 1) {
+        for (Entity* entity : entities) {
+            TransformComponent* transform = entity->getComponent<TransformComponent>();
+            VelocityComponent* velocity = entity->getComponent<VelocityComponent>();
+            if (e.type == SDL_KEYDOWN) {
+                switch (e.key.keysym.sym) {
+                case SDLK_w:
+                case SDLK_UP:
+                    velocity->dy = -(velocity->dyMax);
+                    break;
+                case SDLK_s:
+                case SDLK_DOWN:
+                    velocity->dy = (velocity->dyMax);
+                    break;
+                case SDLK_a:
+                case SDLK_LEFT:
+                    velocity->dx = -(velocity->dxMax);
+                    break;
+                case SDLK_d:
+                case SDLK_RIGHT:
+                    velocity->dx = (velocity->dxMax);
+                    break;
+                }
+            }
+            else if (e.type == SDL_KEYUP) {
+                switch (e.key.keysym.sym) {
+                case SDLK_w:
+                case SDLK_UP:
+                case SDLK_s:
+                case SDLK_DOWN:
+                    velocity->dy = 0;
+                    break;
+                case SDLK_a:
+                case SDLK_LEFT:
+                case SDLK_d:
+                case SDLK_RIGHT:
+                    velocity->dx = 0;
+                    break;
+                }
+            }
+            if (transform && velocity) {
+                transform->position.x += velocity->dx * deltaTime;
+                transform->position.y += velocity->dy * deltaTime;
+                transform->updateTransformMatrix();
+            }
+        }
+    }
+
+    void tryAddEntity(Entity* entity) override {
+        if (entity->getComponent<TransformComponent>()
+            && entity->getComponent<VelocityComponent>()
+            && entity->getComponent<InputComponent>()) {
             entities.push_back(entity);
         }
     }
