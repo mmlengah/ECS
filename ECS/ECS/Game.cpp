@@ -40,27 +40,30 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     keyboardMovementSystem = &(systemManager->registerSystem<KeyboardMovementSystem>());
 
     player = Entity::create();
-    player->addComponent<TransformComponent>(Vector2f(320, 240), 0.0f, Vector2f(2.0f, 2.0f));
-    SDL_Rect a = { 0, 0, 10, 10 };
-    player->addComponent<SpriteComponent>(a);
+    SDL_Rect spriteRect = { 18, 22, 13, 21 };
+    player->addComponent<TransformComponent>(Vector2f(320, 240), 0.0f, Vector2f(1.5f, 1.5f));     
+    player->addComponent<SpriteComponent>(renderer.get(), 
+        "Assets/mystic_woods_2.1/sprites/characters/player.png",
+        spriteRect, 6, 48, 100);
     player->addComponent<VelocityComponent>(100, 100);
     player->addComponent<InputComponent>();
-
+    
+    SDL_Rect a = { 0, 0, 10, 10 };
     auto box = Entity::create();
     box->addComponent<TransformComponent>(Vector2f(0, 0), 0.0f, Vector2f(2.0f, 2.0f));
-    box->addComponent<SpriteComponent>(a);
+    //box->addComponent<SpriteComponent>(a);
 
     auto box2 = Entity::create();
     box2->addComponent<TransformComponent>(Vector2f(620, 0), 0.0f, Vector2f(2.0f, 2.0f));
-    box2->addComponent<SpriteComponent>(a);
+    //box2->addComponent<SpriteComponent>(a);
 
     auto box3 = Entity::create();
     box3->addComponent<TransformComponent>(Vector2f(0, 460), 0.0f, Vector2f(2.0f, 2.0f));
-    box3->addComponent<SpriteComponent>(a);
+    //box3->addComponent<SpriteComponent>(a);
 
     auto box4 = Entity::create();
     box4->addComponent<TransformComponent>(Vector2f(620, 460), 0.0f, Vector2f(2.0f, 2.0f));
-    box4->addComponent<SpriteComponent>(a);
+    //box4->addComponent<SpriteComponent>(a);
 
     systemManager->addAllEntitiesToSystems(Entity::getAllEntities());
 
