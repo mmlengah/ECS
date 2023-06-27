@@ -529,6 +529,22 @@ namespace PC {
 			return a * e * i + b * f * g + c * d * h - c * e * g - b * d * i - a * f * h;
 		}
 
+		Vector2<T> getTranslation() {
+			return Vector2<T>(GetValue(0, 2), GetValue(1, 2));
+		}
+
+		Vector2<T> getScale() {
+			float scaleX = std::sqrt(GetValue(0, 0) * GetValue(0, 0) + GetValue(1, 0) * GetValue(1, 0));
+			float scaleY = std::sqrt(GetValue(0, 1) * GetValue(0, 1) + GetValue(1, 1) * GetValue(1, 1));
+			return Vector2<T>(scaleX, scaleY);
+		}
+
+		float getRotation() {
+			float rotation = std::atan2(GetValue(1, 0), GetValue(0, 0));
+			return static_cast<float>(rotation * 180.0f / M_PI);  // Convert to degrees
+		}
+
+
 		// Create a 3x3 transformation matrix for translation
 		static Matrix3x3 Matrix3x3FromTranslation(const Vector2<T>& v) {
 			Matrix3x3 temp;
@@ -723,6 +739,51 @@ namespace PC {
 				return result;
 			}
 		}
+
+		// Assumes matrix is composed in order: Scale, then Rotate, then Translate
+		Vector3<T> getScale() const {
+			return Vector3<T>(sqrt(matrix[0][0] * matrix[0][0] + matrix[0][1] * matrix[0][1] + matrix[0][2] * matrix[0][2]),
+				sqrt(matrix[1][0] * matrix[1][0] + matrix[1][1] * matrix[1][1] + matrix[1][2] * matrix[1][2]),
+				sqrt(matrix[2][0] * matrix[2][0] + matrix[2][1] * matrix[2][1] + matrix[2][2] * matrix[2][2]));
+		}
+
+		Vector3<T> getTranslation() const {
+			return Vector3<T>(matrix[0][3], matrix[1][3], matrix[2][3]);
+		}
+
+		// Returns Euler angles in degrees
+		Vector3<T> getRotation() const {
+			// Extract scale from matrix
+			Vector3<T> scale = getScale();
+
+			// Normalize columns of rotation submatrix
+			T a = matrix[0][0] / scale.x;
+			T b = matrix[0][1] / scale.x;
+			T c = matrix[0][2] / scale.x;
+			T d = matrix[1][0] / scale.y;
+			T e = matrix[1][1] / scale.y;
+			T f = matrix[1][2] / scale.y;
+			T g = matrix[2][0] / scale.z;
+			T h = matrix[2][1] / scale.z;
+			T i = matrix[2][2] / scale.z;
+
+			// Calculate Y-axis angle
+			T yAngle = atan2(-c, sqrt(a * a + d * d));
+
+			// Calculate X and Z angles depending on cos(yAngle)
+			T xAngle, zAngle;
+			if (abs(cos(yAngle)) > 0.00001) {
+				xAngle = atan2(f, i);
+				zAngle = atan2(b, a);
+			}
+			else {
+				xAngle = atan2(e, g);
+				zAngle = 0;
+			}
+
+			return Vector3<T>(xAngle * 180.0 / M_PI, yAngle * 180.0 / M_PI, zAngle * 180.0 / M_PI);
+		}
+
 
 		static Matrix4x4 Matrix4x4FromTranslation(const Vector3<T>& v) {
 			Matrix4x4 temp;

@@ -6,6 +6,7 @@
 #include <memory>
 #include <SDL.h>
 #include "PCM.h"
+#include "Camera.h"
 
 using namespace PC;
 
@@ -90,9 +91,20 @@ public:
     Vector2f position;
     float rotation;
     Vector2f scale;
+    Matrix3x3<float> transformMatrix;
+
     TransformComponent(Vector2f position = Vector2f(0.0f, 0.0f), float rotation = 0.0f, Vector2f scale = Vector2f(1.0f, 1.0f)) : position(position),
         rotation(rotation), scale(scale)
-    {}
+    {
+        updateTransformMatrix();
+    }
+
+    void updateTransformMatrix()
+    {
+        transformMatrix = Matrix3x3<float>::Matrix3x3FromTranslation(position) *
+            Matrix3x3<float>::Matrix3x3FromRotation(rotation) *
+            Matrix3x3<float>::Matrix3x3FromScale(scale);
+    }    
 };
 
 class SpriteComponent : public Component {
@@ -104,8 +116,8 @@ public:
 class RenderSystem : public System {
 public:
     SDL_Renderer* renderer;
-
-    RenderSystem(SDL_Renderer* renderer) : renderer(renderer) {}
+    Camera* cam;
+    RenderSystem(SDL_Renderer* renderer, Camera* cam) : renderer(renderer), cam(cam) {}
 
     void update() {
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -113,15 +125,22 @@ public:
 
         for (Entity* entity : entities) {
             TransformComponent* transform = entity->getComponent<TransformComponent>();
-            SpriteComponent* sprite = entity->getComponent<SpriteComponent>();
-
+            SpriteComponent* sprite = entity->getComponent<SpriteComponent>();            
             if (transform) {
-                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+                Matrix3x3<float> worldSpace = cam->getTransformMatrix() * transform->transformMatrix;
+                
+                Vector2f pos = worldSpace.getTranslation();
+                Vector2f scale = worldSpace.getScale();
+                float rot = worldSpace.getRotation();
+
                 SDL_Rect temp = sprite->rect;
-                temp.x = static_cast<int>(transform->position.x);
-                temp.y = static_cast<int>(transform->position.y);
-                temp.w = static_cast<int>(temp.w * transform->scale.x);
-                temp.h = static_cast<int>(temp.h * transform->scale.y);
+           
+                temp.w = static_cast<int>(temp.w * scale.x);
+                temp.h = static_cast<int>(temp.h * scale.y);
+                temp.x = static_cast<int>(pos.x);
+                temp.y = static_cast<int>(pos.y);
+
+                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
                 SDL_RenderFillRect(renderer, &temp);
                 //SDL_RenderCopyEx(renderer, texture, nullptr, &temp, transform->rotation, nullptr, SDL_FLIP_NONE);
             }
