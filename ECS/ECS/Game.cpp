@@ -49,21 +49,23 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     player->addComponent<InputComponent>();
     
     SDL_Rect a = { 0, 0, 10, 10 };
+    SDL_Color white = { 255, 255, 255, 255 };
+
     auto box = Entity::create();
     box->addComponent<TransformComponent>(Vector2f(0, 0), 0.0f, Vector2f(2.0f, 2.0f));
-    //box->addComponent<SpriteComponent>(a);
+    box->addComponent<SquareComponent>(a, white);
 
     auto box2 = Entity::create();
-    box2->addComponent<TransformComponent>(Vector2f(620, 0), 0.0f, Vector2f(2.0f, 2.0f));
-    //box2->addComponent<SpriteComponent>(a);
+    box2->addComponent<TransformComponent>(Vector2f(620, 0), 0.0f, Vector2f(3.0f, 3.0f));
+    box2->addComponent<SquareComponent>(a, white);
 
     auto box3 = Entity::create();
     box3->addComponent<TransformComponent>(Vector2f(0, 460), 0.0f, Vector2f(2.0f, 2.0f));
-    //box3->addComponent<SpriteComponent>(a);
+    box3->addComponent<SquareComponent>(a, white);
 
     auto box4 = Entity::create();
     box4->addComponent<TransformComponent>(Vector2f(620, 460), 0.0f, Vector2f(2.0f, 2.0f));
-    //box4->addComponent<SpriteComponent>(a);
+    box4->addComponent<SquareComponent>(a, white);
 
     systemManager->addAllEntitiesToSystems(Entity::getAllEntities());
 

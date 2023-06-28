@@ -181,6 +181,14 @@ public:
     InputComponent() {}
 };
 
+class SquareComponent : public Component {
+public:
+    SDL_Rect dstRect;
+    SDL_Color color;
+
+    SquareComponent(SDL_Rect dstRect, SDL_Color color) : dstRect(dstRect), color(color) {}
+};
+
 class RenderSystem : public System {
 public:
     SDL_Renderer* renderer;
@@ -194,7 +202,8 @@ public:
         for (Entity* entity : entities) {
             TransformComponent* transform = entity->getComponent<TransformComponent>();
             SpriteComponent* sprite = entity->getComponent<SpriteComponent>();            
-            if (transform) {
+            SquareComponent* shape = entity->getComponent<SquareComponent>();
+            if (sprite) {
                 Matrix3x3<float> worldSpace = cam->getTransformMatrix() * transform->transformMatrix;
                 
                 Vector2f pos = worldSpace.getTranslation();
@@ -213,13 +222,30 @@ public:
                 //SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
                 //SDL_RenderFillRect(renderer, &temp);
             }
+            else if (shape) {
+                // render shape
+                Matrix3x3<float> worldSpace = cam->getTransformMatrix() * transform->transformMatrix;
+
+                Vector2f pos = worldSpace.getTranslation();
+                Vector2f scale = worldSpace.getScale();
+
+                SDL_Rect temp = shape->dstRect;
+
+                temp.w = static_cast<int>(temp.w * scale.x);
+                temp.h = static_cast<int>(temp.h * scale.y);
+                temp.x = static_cast<int>(pos.x) - temp.w / 2;
+                temp.y = static_cast<int>(pos.y) - temp.h / 2;
+
+                SDL_SetRenderDrawColor(renderer, shape->color.r, shape->color.g, shape->color.b, shape->color.a);
+                SDL_RenderFillRect(renderer, &temp);
+            }
         }
 
         SDL_RenderPresent(renderer);
     }
 
     void tryAddEntity(Entity* entity) override {
-        if (entity->getComponent<TransformComponent>() && entity->getComponent<SpriteComponent>()) {
+        if (entity->getComponent<TransformComponent>() && entity->getComponent<SpriteComponent>() || entity->getComponent<SquareComponent>()) {
             entities.push_back(entity);
         }
     }
