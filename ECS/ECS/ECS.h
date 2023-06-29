@@ -141,6 +141,17 @@ private:
     Matrix3x3<float> transformMatrix;
 };
 
+class AnimationState {
+public:
+    int yOffset;
+    int frameCount;
+    Uint32 frameDelay;
+    SDL_RendererFlip flip;
+
+    AnimationState(int yOffset = 0, int frameCount = 0, Uint32 frameDelay = 0, SDL_RendererFlip flip = SDL_FLIP_NONE)
+        : yOffset(yOffset), frameCount(frameCount), frameDelay(frameDelay), flip(flip) {}
+};
+
 class SpriteComponent : public Component {
 public:
     SDL_Texture* spriteSheet;
@@ -152,9 +163,12 @@ public:
     int xOffset;
     Uint32 lastFrameTime;
     Uint32 frameDelay;
+    SDL_RendererFlip flip;
+    std::unordered_map<std::string, AnimationState> animationStates;
+    std::string currentState;
 
-    SpriteComponent(SDL_Renderer* renderer, const char* path, SDL_Rect spriteRect, int frames,
-        int frameWidth, Uint32 frameDelay)
+    SpriteComponent(SDL_Renderer* renderer, const char* path, SDL_Rect spriteRect, int frames = 0,
+        int frameWidth = 0, Uint32 frameDelay = 0)
         : srcRect(spriteRect), dstRect({ 0, 0, spriteRect.w * 2, spriteRect.h * 2 }),
         frameCount(frames), currentFrame(0), frameWidth(frameWidth), xOffset(spriteRect.x),
         lastFrameTime(0), frameDelay(frameDelay) {
@@ -167,12 +181,33 @@ public:
         }
     }
 
-    void setAnimation(int yOffset, int frames, Uint32 frameDelay) {
-        srcRect.y = yOffset;
-        this->frameCount = frames;
-        this->frameDelay = frameDelay;
-        currentFrame = 0;
+    void addAnimationState(const std::string& stateName, AnimationState state) {
+        animationStates[stateName] = state;
     }
+
+    void setAnimationState(const std::string& stateName) {
+        auto it = animationStates.find(stateName);
+        if (it != animationStates.end()) {
+            currentState = stateName;
+            AnimationState& state = it->second;
+            srcRect.y = state.yOffset;
+            frameCount = state.frameCount;
+            frameDelay = state.frameDelay;
+            flip = state.flip;  // New line to set flip status
+            currentFrame = 0;
+        }
+        else {
+            // Handle error: No such state exists
+            std::cerr << "No such animation state exists: " << stateName << std::endl;
+        }
+    }
+
+    //void setAnimation(int yOffset, int frames, Uint32 frameDelay) {
+    //    srcRect.y = yOffset;
+    //    this->frameCount = frames;
+    //    this->frameDelay = frameDelay;
+    //    currentFrame = 0;
+    //}
 
     void render(SDL_Renderer* renderer, int x, int y) {
         dstRect.x = x - dstRect.w;
@@ -212,7 +247,21 @@ public:
 
     std::unordered_map<SDL_Keycode, std::unordered_map<FunctionId, std::function<void(Entity&)>>> keyDownMapping;
     std::unordered_map<SDL_Keycode, std::unordered_map<FunctionId, std::function<void(Entity&)>>> keyUpMapping;
+    std::unordered_map<uint8_t, std::unordered_map<FunctionId, std::function<void(Entity&)>>> mouseButtonDownMapping;
+    std::unordered_map<uint8_t, std::unordered_map<FunctionId, std::function<void(Entity&)>>> mouseButtonUpMapping;
     FunctionId nextId = 0;
+
+    FunctionId bindMouseButtonDown(uint8_t button, std::function<void(Entity&)> command) {
+        FunctionId id = nextId++;
+        mouseButtonDownMapping[button][id] = command;
+        return id;
+    }
+
+    FunctionId bindMouseButtonUp(uint8_t button, std::function<void(Entity&)> command) {
+        FunctionId id = nextId++;
+        mouseButtonUpMapping[button][id] = command;
+        return id;
+    }
 
     FunctionId bindKeyDown(SDL_Keycode key, std::function<void(Entity&)> command) {
         FunctionId id = nextId++;
@@ -239,6 +288,23 @@ public:
 
         auto itUp = keyUpMapping.find(key);
         if (itUp != keyUpMapping.end()) {
+            itUp->second.erase(id);
+        }
+    }
+
+    void unbindMouseButton(uint8_t button) {
+        mouseButtonDownMapping.erase(button);
+        mouseButtonUpMapping.erase(button);
+    }
+
+    void unbindMouseFunction(uint8_t button, FunctionId id) {
+        auto itDown = mouseButtonDownMapping.find(button);
+        if (itDown != mouseButtonDownMapping.end()) {
+            itDown->second.erase(id);
+        }
+
+        auto itUp = mouseButtonUpMapping.find(button);
+        if (itUp != mouseButtonUpMapping.end()) {
             itUp->second.erase(id);
         }
     }
@@ -292,7 +358,7 @@ public:
                 temp.y = static_cast<int>(pos.y) - temp.h / 2;
 
                 SDL_RenderCopyEx(renderer, sprite->spriteSheet, &(sprite->srcRect), &temp,
-                    transform->getRotation(), nullptr, SDL_FLIP_NONE);
+                    transform->getRotation(), nullptr, sprite->flip);
                 sprite->nextFrame();
             }
             else if (shape) {
@@ -345,6 +411,24 @@ public:
                     SDL_Keycode key = event.key.keysym.sym;
                     auto it = input->keyUpMapping.find(key);
                     if (it != input->keyUpMapping.end()) {
+                        for (auto& fn : it->second) {
+                            if (fn.second) fn.second(*entity);
+                        }
+                    }
+                }
+                if (event.type == SDL_MOUSEBUTTONDOWN) {
+                    uint8_t button = event.button.button;
+                    auto it = input->mouseButtonDownMapping.find(button);
+                    if (it != input->mouseButtonDownMapping.end()) {
+                        for (auto& fn : it->second) {
+                            if (fn.second) fn.second(*entity);
+                        }
+                    }
+                }
+                else if (event.type == SDL_MOUSEBUTTONUP) {
+                    uint8_t button = event.button.button;
+                    auto it = input->mouseButtonUpMapping.find(button);
+                    if (it != input->mouseButtonUpMapping.end()) {
                         for (auto& fn : it->second) {
                             if (fn.second) fn.second(*entity);
                         }

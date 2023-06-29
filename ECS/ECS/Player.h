@@ -25,6 +25,15 @@ std::shared_ptr<Entity> createPlayerPrefab(SDL_Renderer* renderer) {
     VelocityComponent* velocity = player->getComponent<VelocityComponent>();
     UpdateComponent* update = player->getComponent<UpdateComponent>();
     TransformComponent* transform = player->getComponent<TransformComponent>();
+    SpriteComponent* sprite = player->getComponent<SpriteComponent>();
+
+    // Define animation states
+    sprite->addAnimationState("idle", AnimationState(22, 6, 100));
+    sprite->addAnimationState("idleLeft", AnimationState(70, 6, 100));
+    sprite->addAnimationState("idleRight", AnimationState(70, 6, 100, SDL_FLIP_HORIZONTAL));
+
+    // Set the animation
+    sprite->setAnimationState("idleLeft");
 
     //upwards movement
     input->bindKeyDown(SDLK_w, [velocity](Entity& entity) {
