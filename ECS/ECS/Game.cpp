@@ -1,10 +1,11 @@
 #include "Game.h"
 #include <SDL_image.h>
 #include "ECS.h"
+#include "Player.h"
 
 Game::Game() : quit(false), oldTime(0), currentTime(0), deltaTime(0), win(nullptr, SDL_DestroyWindow),
-renderer(nullptr, SDL_DestroyRenderer), renderSystem(nullptr), keyboardMovementSystem(nullptr), 
-cam(nullptr), player(nullptr)
+renderer(nullptr, SDL_DestroyRenderer), renderSystem(nullptr), inputSystem(nullptr),
+updateSystem(nullptr), cam(nullptr), player(nullptr)
 {
 
 }
@@ -12,8 +13,9 @@ cam(nullptr), player(nullptr)
 Game::~Game()
 {
     delete renderSystem;
+    delete inputSystem;
+    delete updateSystem;
     delete cam;
-    delete keyboardMovementSystem;
     SDL_Quit();
 }
 
@@ -37,17 +39,11 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     systemManager = std::make_unique<SystemManager>();
 
     renderSystem = &(systemManager->registerSystem<RenderSystem>(renderer.get(), cam));
-    keyboardMovementSystem = &(systemManager->registerSystem<KeyboardMovementSystem>());
-
-    player = Entity::create();
-    SDL_Rect spriteRect = { 18, 22, 13, 21 };
-    player->addComponent<TransformComponent>(Vector2f(320, 240), 0.0f, Vector2f(1.5f, 1.5f));     
-    player->addComponent<SpriteComponent>(renderer.get(), 
-        "Assets/mystic_woods_2.1/sprites/characters/player.png",
-        spriteRect, 6, 48, 100);
-    player->addComponent<VelocityComponent>(100, 100);
-    player->addComponent<InputComponent>();
+    inputSystem = &(systemManager->registerSystem<InputSystem>());
+    updateSystem = &(systemManager->registerSystem<UpdateSystem>());
     
+    player = createPlayerPrefab(renderer.get());
+
     SDL_Rect a = { 0, 0, 10, 10 };
     SDL_Color white = { 255, 255, 255, 255 };
 
@@ -88,7 +84,7 @@ void Game::Run()
             if (event.type == SDL_QUIT) {
                 quit = true;
             }
-            keyboardMovementSystem->update(event, deltaTime);
+            inputSystem->update(event);
         }
 
         // Update game logic
@@ -101,7 +97,8 @@ void Game::Run()
 
 void Game::Update()
 {
-    cam->lookAt(player->getComponent<TransformComponent>()->position);
+    //cam->lookAt(player->getComponent<TransformComponent>()->position);
+    updateSystem->update(deltaTime);
 }
 
 void Game::Render()

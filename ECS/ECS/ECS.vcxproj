@@ -150,7 +150,6 @@ xcopy /D /Y "$(SolutionDir)Dependancies\SDL2_image\lib\x64\*.dll" "$(TargetDir)"
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Player.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />

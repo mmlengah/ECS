@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <typeindex>
 #include <memory>
+#include <functional>
 #include <SDL.h>
 #include <SDL_image.h>
 #include "PCM.h"
@@ -162,7 +163,6 @@ public:
     }
 };
 
-
 class VelocityComponent : public Component {
 public:
     int dx;
@@ -176,9 +176,56 @@ public:
 
 class InputComponent : public Component {
 public:
-    std::unordered_map<SDL_Keycode, bool> keyStates;
+    using FunctionId = int;
 
-    InputComponent() {}
+    std::unordered_map<SDL_Keycode, std::unordered_map<FunctionId, std::function<void(Entity&)>>> keyDownMapping;
+    std::unordered_map<SDL_Keycode, std::unordered_map<FunctionId, std::function<void(Entity&)>>> keyUpMapping;
+    std::unordered_map<SDL_Keycode, std::unordered_map<FunctionId, std::function<void(Entity&)>>> keyHoldMapping;
+    std::unordered_map<SDL_Keycode, bool> keyState; // This will store whether each key is currently down
+    FunctionId nextId = 0;
+
+    FunctionId bindKeyDown(SDL_Keycode key, std::function<void(Entity&)> command) {
+        FunctionId id = nextId++;
+        keyDownMapping[key][id] = command;
+        return id;
+    }
+
+    FunctionId bindKeyUp(SDL_Keycode key, std::function<void(Entity&)> command) {
+        FunctionId id = nextId++;
+        keyUpMapping[key][id] = command;
+        return id;
+    }
+
+    FunctionId bindKeyHold(SDL_Keycode key, std::function<void(Entity&)> command) {
+        FunctionId id = nextId++;
+        keyHoldMapping[key][id] = command;
+        return id;
+    }
+
+    void unbindKey(SDL_Keycode key) {
+        keyDownMapping.erase(key);
+        keyUpMapping.erase(key);
+    }
+
+    void unbindFunction(SDL_Keycode key, FunctionId id) {
+        auto itDown = keyDownMapping.find(key);
+        if (itDown != keyDownMapping.end()) {
+            itDown->second.erase(id);
+        }
+
+        auto itUp = keyUpMapping.find(key);
+        if (itUp != keyUpMapping.end()) {
+            itUp->second.erase(id);
+        }
+    }
+
+    void setKeyDown(SDL_Keycode key) {
+        keyState[key] = true;
+    }
+
+    void setKeyUp(SDL_Keycode key) {
+        keyState[key] = false;
+    }
 };
 
 class SquareComponent : public Component {
@@ -187,6 +234,15 @@ public:
     SDL_Color color;
 
     SquareComponent(SDL_Rect dstRect, SDL_Color color) : dstRect(dstRect), color(color) {}
+};
+
+class UpdateComponent : public Component {
+public:
+    std::vector<std::function<void(Entity&, float)>> onUpdate;
+
+    void addUpdateFunction(std::function<void(Entity&, float)> updateFn) {
+        onUpdate.push_back(updateFn);
+    }
 };
 
 class RenderSystem : public System {
@@ -211,16 +267,15 @@ public:
                 float rot = worldSpace.getRotation();
 
                 SDL_Rect temp = sprite->dstRect;
-           
+
                 temp.w = static_cast<int>(temp.w * scale.x);
                 temp.h = static_cast<int>(temp.h * scale.y);
                 temp.x = static_cast<int>(pos.x) - temp.w / 2;
                 temp.y = static_cast<int>(pos.y) - temp.h / 2;
 
-                SDL_RenderCopyEx(renderer, sprite->spriteSheet, &(sprite->srcRect), &temp, transform->rotation, nullptr, SDL_FLIP_NONE);
-
-                //SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-                //SDL_RenderFillRect(renderer, &temp);
+                SDL_RenderCopyEx(renderer, sprite->spriteSheet, &(sprite->srcRect), &temp,
+                    transform->rotation, nullptr, SDL_FLIP_NONE);
+                sprite->nextFrame();
             }
             else if (shape) {
                 // render shape
@@ -251,62 +306,72 @@ public:
     }
 };
 
-class KeyboardMovementSystem : public System {
+class InputSystem : public System {
 public:
-    void update(SDL_Event& e, float deltaTime = 1) {
+    void update(SDL_Event& event) {
         for (Entity* entity : entities) {
-            TransformComponent* transform = entity->getComponent<TransformComponent>();
-            VelocityComponent* velocity = entity->getComponent<VelocityComponent>();
-            if (e.type == SDL_KEYDOWN) {
-                switch (e.key.keysym.sym) {
-                case SDLK_w:
-                case SDLK_UP:
-                    velocity->dy = -(velocity->dyMax);
-                    break;
-                case SDLK_s:
-                case SDLK_DOWN:
-                    velocity->dy = (velocity->dyMax);
-                    break;
-                case SDLK_a:
-                case SDLK_LEFT:
-                    velocity->dx = -(velocity->dxMax);
-                    break;
-                case SDLK_d:
-                case SDLK_RIGHT:
-                    velocity->dx = (velocity->dxMax);
-                    break;
+            InputComponent* input = entity->getComponent<InputComponent>();
+            if (input) {
+                // Check for keydown and keyup events
+                if (event.type == SDL_KEYDOWN) {
+                    SDL_Keycode key = event.key.keysym.sym;
+                    input->setKeyDown(key);
+                    auto it = input->keyDownMapping.find(key);
+                    if (it != input->keyDownMapping.end()) {
+                        for (auto& fn : it->second) {
+                            if (fn.second) fn.second(*entity);
+                        }
+                    }
                 }
-            }
-            else if (e.type == SDL_KEYUP) {
-                switch (e.key.keysym.sym) {
-                case SDLK_w:
-                case SDLK_UP:
-                case SDLK_s:
-                case SDLK_DOWN:
-                    velocity->dy = 0;
-                    break;
-                case SDLK_a:
-                case SDLK_LEFT:
-                case SDLK_d:
-                case SDLK_RIGHT:
-                    velocity->dx = 0;
-                    break;
+                else if (event.type == SDL_KEYUP) {
+                    SDL_Keycode key = event.key.keysym.sym;
+                    input->setKeyUp(key);
+                    auto it = input->keyUpMapping.find(key);
+                    if (it != input->keyUpMapping.end()) {
+                        for (auto& fn : it->second) {
+                            if (fn.second) fn.second(*entity);
+                        }
+                    }
                 }
-            }
-            if (transform && velocity) {
-                transform->position.x += velocity->dx * deltaTime;
-                transform->position.y += velocity->dy * deltaTime;
-                transform->updateTransformMatrix();
+
+                // Check for key hold events
+                for (auto& keyStatePair : input->keyState) {
+                    if (keyStatePair.second) { // If the key is down
+                        auto it = input->keyHoldMapping.find(keyStatePair.first);
+                        if (it != input->keyHoldMapping.end()) {
+                            for (auto& fn : it->second) {
+                                if (fn.second) fn.second(*entity);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 
     void tryAddEntity(Entity* entity) override {
-        if (entity->getComponent<TransformComponent>()
-            && entity->getComponent<VelocityComponent>()
-            && entity->getComponent<InputComponent>()) {
+        if (entity->getComponent<InputComponent>()) {
             entities.push_back(entity);
         }
     }
 };
 
+class UpdateSystem : public System {
+public:
+    void update(float deltaTime = 1) {
+        for (Entity* entity : entities) {
+            UpdateComponent* update = entity->getComponent<UpdateComponent>();
+            if (update) {
+                for (auto& updateFunction : update->onUpdate) {
+                    updateFunction(*entity, deltaTime);
+                }
+            }
+        }
+    }
+
+    void tryAddEntity(Entity* entity) override {
+        if (entity->getComponent<UpdateComponent>()) {
+            entities.push_back(entity);
+        }
+    }
+};

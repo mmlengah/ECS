@@ -25,7 +25,8 @@ private:
     std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)> renderer;
     std::unique_ptr<SystemManager> systemManager;
     RenderSystem* renderSystem;
-    KeyboardMovementSystem* keyboardMovementSystem;
+    InputSystem* inputSystem;        
+    UpdateSystem* updateSystem;
     Camera* cam;
     std::shared_ptr<Entity> player;
 };
