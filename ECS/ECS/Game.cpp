@@ -62,6 +62,7 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     auto box4 = Entity::create();
     box4->addComponent<TransformComponent>(Vector2f(620, 460), 0.0f, Vector2f(2.0f, 2.0f));
     box4->addComponent<SquareComponent>(a, white);
+    
 
     systemManager->addAllEntitiesToSystems(Entity::getAllEntities());
 
@@ -97,7 +98,7 @@ void Game::Run()
 
 void Game::Update()
 {
-    //cam->lookAt(player->getComponent<TransformComponent>()->position);
+    cam->lookAt(player->getComponent<TransformComponent>()->getPosition());
     updateSystem->update(deltaTime);
 }
 

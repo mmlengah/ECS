@@ -26,16 +26,46 @@ std::shared_ptr<Entity> createPlayerPrefab(SDL_Renderer* renderer) {
     UpdateComponent* update = player->getComponent<UpdateComponent>();
     TransformComponent* transform = player->getComponent<TransformComponent>();
 
-    //add wasd controlls? 
+    //upwards movement
     input->bindKeyDown(SDLK_w, [velocity](Entity& entity) {
-        std::cout << "pressed" << std::endl;
+        velocity->dy = -velocity->dyMax;
+    });
+
+    input->bindKeyUp(SDLK_w, [velocity](Entity& entity) {
+        velocity->dy = 0;
+    });
+
+    //downwards movement
+    input->bindKeyDown(SDLK_s, [velocity](Entity& entity) {
         velocity->dy = velocity->dyMax;
+    });
+
+    input->bindKeyUp(SDLK_s, [velocity](Entity& entity) {
+        velocity->dy = 0;
+    });
+
+    //left movement
+    input->bindKeyDown(SDLK_a, [velocity](Entity& entity) {
+        velocity->dx = -velocity->dxMax;
+    });
+
+    input->bindKeyUp(SDLK_a, [velocity](Entity& entity) {
+        velocity->dx = 0;
+    });
+
+    //right movement
+    input->bindKeyDown(SDLK_d, [velocity](Entity& entity) {
+        velocity->dx = velocity->dxMax;
+    });
+
+    input->bindKeyUp(SDLK_d, [velocity](Entity& entity) {
+        velocity->dx = 0;
     });
 
     //update
     update->addUpdateFunction([transform, velocity](Entity& entity, float deltaTime) {
-        transform->position.x += velocity->dx * deltaTime;
-        transform->position.y += velocity->dy * deltaTime;
+        transform->setPosition({ transform->getPosition().x + velocity->dx * deltaTime,
+                                transform->getPosition().y + velocity->dy * deltaTime });
     });
 
     // Return the created player entity

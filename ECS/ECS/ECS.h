@@ -89,24 +89,56 @@ private:
 };
 
 class TransformComponent : public Component {
-public:
+public:   
+    TransformComponent(Vector2f position = Vector2f(0.0f, 0.0f),
+        float rotation = 0.0f, Vector2f scale = Vector2f(1.0f, 1.0f)) {
+        setPosition(position);
+        setRotation(rotation);
+        setScale(scale);
+    }
+
+    Vector2f getPosition() {
+        return position;
+    }
+
+    void setPosition(const Vector2f& pos) {
+        position = pos;
+        updateTransformMatrix();
+    }
+
+    float getRotation() {
+        return rotation;
+    }
+
+    void setRotation(float rot) {
+        rotation = rot;
+        updateTransformMatrix();
+    }
+
+    Vector2f getScale() {
+        return scale;
+    }
+
+    void setScale(const Vector2f& scl) {
+        scale = scl;
+        updateTransformMatrix();
+    }
+
+    Matrix3x3<float> getTransformMatrix() {
+        return transformMatrix;
+    }
+
+    void updateTransformMatrix() {
+        transformMatrix = Matrix3x3<float>::Matrix3x3FromTranslation(position) *
+            Matrix3x3<float>::Matrix3x3FromRotation(rotation) *
+            Matrix3x3<float>::Matrix3x3FromScale(scale);
+    }
+
+private:
     Vector2f position;
     float rotation;
     Vector2f scale;
     Matrix3x3<float> transformMatrix;
-
-    TransformComponent(Vector2f position = Vector2f(0.0f, 0.0f), float rotation = 0.0f, Vector2f scale = Vector2f(1.0f, 1.0f)) : position(position),
-        rotation(rotation), scale(scale)
-    {
-        updateTransformMatrix();
-    }
-
-    void updateTransformMatrix()
-    {
-        transformMatrix = Matrix3x3<float>::Matrix3x3FromTranslation(position) *
-            Matrix3x3<float>::Matrix3x3FromRotation(rotation) *
-            Matrix3x3<float>::Matrix3x3FromScale(scale);
-    }    
 };
 
 class SpriteComponent : public Component {
@@ -180,8 +212,6 @@ public:
 
     std::unordered_map<SDL_Keycode, std::unordered_map<FunctionId, std::function<void(Entity&)>>> keyDownMapping;
     std::unordered_map<SDL_Keycode, std::unordered_map<FunctionId, std::function<void(Entity&)>>> keyUpMapping;
-    std::unordered_map<SDL_Keycode, std::unordered_map<FunctionId, std::function<void(Entity&)>>> keyHoldMapping;
-    std::unordered_map<SDL_Keycode, bool> keyState; // This will store whether each key is currently down
     FunctionId nextId = 0;
 
     FunctionId bindKeyDown(SDL_Keycode key, std::function<void(Entity&)> command) {
@@ -193,12 +223,6 @@ public:
     FunctionId bindKeyUp(SDL_Keycode key, std::function<void(Entity&)> command) {
         FunctionId id = nextId++;
         keyUpMapping[key][id] = command;
-        return id;
-    }
-
-    FunctionId bindKeyHold(SDL_Keycode key, std::function<void(Entity&)> command) {
-        FunctionId id = nextId++;
-        keyHoldMapping[key][id] = command;
         return id;
     }
 
@@ -217,14 +241,6 @@ public:
         if (itUp != keyUpMapping.end()) {
             itUp->second.erase(id);
         }
-    }
-
-    void setKeyDown(SDL_Keycode key) {
-        keyState[key] = true;
-    }
-
-    void setKeyUp(SDL_Keycode key) {
-        keyState[key] = false;
     }
 };
 
@@ -255,12 +271,14 @@ public:
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer); //error here
 
-        for (Entity* entity : entities) {
+        for (auto it = entities.rbegin(); it != entities.rend(); ++it) {
+            Entity* entity = *it;
             TransformComponent* transform = entity->getComponent<TransformComponent>();
             SpriteComponent* sprite = entity->getComponent<SpriteComponent>();            
             SquareComponent* shape = entity->getComponent<SquareComponent>();
             if (sprite) {
-                Matrix3x3<float> worldSpace = cam->getTransformMatrix() * transform->transformMatrix;
+                Matrix3x3<float> worldSpace = cam->getTransformMatrix() *
+                    transform->getTransformMatrix();
                 
                 Vector2f pos = worldSpace.getTranslation();
                 Vector2f scale = worldSpace.getScale();
@@ -274,12 +292,13 @@ public:
                 temp.y = static_cast<int>(pos.y) - temp.h / 2;
 
                 SDL_RenderCopyEx(renderer, sprite->spriteSheet, &(sprite->srcRect), &temp,
-                    transform->rotation, nullptr, SDL_FLIP_NONE);
+                    transform->getRotation(), nullptr, SDL_FLIP_NONE);
                 sprite->nextFrame();
             }
             else if (shape) {
                 // render shape
-                Matrix3x3<float> worldSpace = cam->getTransformMatrix() * transform->transformMatrix;
+                Matrix3x3<float> worldSpace = cam->getTransformMatrix() *
+                    transform->getTransformMatrix();
 
                 Vector2f pos = worldSpace.getTranslation();
                 Vector2f scale = worldSpace.getScale();
@@ -315,7 +334,6 @@ public:
                 // Check for keydown and keyup events
                 if (event.type == SDL_KEYDOWN) {
                     SDL_Keycode key = event.key.keysym.sym;
-                    input->setKeyDown(key);
                     auto it = input->keyDownMapping.find(key);
                     if (it != input->keyDownMapping.end()) {
                         for (auto& fn : it->second) {
@@ -325,23 +343,10 @@ public:
                 }
                 else if (event.type == SDL_KEYUP) {
                     SDL_Keycode key = event.key.keysym.sym;
-                    input->setKeyUp(key);
                     auto it = input->keyUpMapping.find(key);
                     if (it != input->keyUpMapping.end()) {
                         for (auto& fn : it->second) {
                             if (fn.second) fn.second(*entity);
-                        }
-                    }
-                }
-
-                // Check for key hold events
-                for (auto& keyStatePair : input->keyState) {
-                    if (keyStatePair.second) { // If the key is down
-                        auto it = input->keyHoldMapping.find(keyStatePair.first);
-                        if (it != input->keyHoldMapping.end()) {
-                            for (auto& fn : it->second) {
-                                if (fn.second) fn.second(*entity);
-                            }
                         }
                     }
                 }
