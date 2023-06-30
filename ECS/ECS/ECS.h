@@ -166,12 +166,13 @@ public:
     SDL_RendererFlip flip;
     std::unordered_map<std::string, AnimationState> animationStates;
     std::string currentState;
+    bool animationPlaying;
 
     SpriteComponent(SDL_Renderer* renderer, const char* path, SDL_Rect spriteRect, int frames = 0,
         int frameWidth = 0, Uint32 frameDelay = 0)
         : srcRect(spriteRect), dstRect({ 0, 0, spriteRect.w * 2, spriteRect.h * 2 }),
         frameCount(frames), currentFrame(0), frameWidth(frameWidth), xOffset(spriteRect.x),
-        lastFrameTime(0), frameDelay(frameDelay) {
+        lastFrameTime(0), frameDelay(frameDelay), flip(SDL_FLIP_NONE), animationPlaying(false) {
         spriteSheet = IMG_LoadTexture(renderer, path);
     }
 
@@ -188,6 +189,7 @@ public:
     void setAnimationState(const std::string& stateName) {
         auto it = animationStates.find(stateName);
         if (it != animationStates.end()) {
+            animationPlaying = true;
             currentState = stateName;
             AnimationState& state = it->second;
             srcRect.y = state.yOffset;
@@ -201,13 +203,6 @@ public:
             std::cerr << "No such animation state exists: " << stateName << std::endl;
         }
     }
-
-    //void setAnimation(int yOffset, int frames, Uint32 frameDelay) {
-    //    srcRect.y = yOffset;
-    //    this->frameCount = frames;
-    //    this->frameDelay = frameDelay;
-    //    currentFrame = 0;
-    //}
 
     void render(SDL_Renderer* renderer, int x, int y) {
         dstRect.x = x - dstRect.w;
@@ -226,7 +221,11 @@ public:
             srcRect.x = xOffset + (currentFrame * frameWidth);
             // Set the time of this frame.
             lastFrameTime = currentTime;
-        }
+
+            if (currentFrame == frameCount - 1) {
+                animationPlaying = false;
+            }
+        }        
     }
 };
 

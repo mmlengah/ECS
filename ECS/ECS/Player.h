@@ -28,9 +28,10 @@ std::shared_ptr<Entity> createPlayerPrefab(SDL_Renderer* renderer) {
     SpriteComponent* sprite = player->getComponent<SpriteComponent>();
 
     // Define animation states
-    sprite->addAnimationState("idle", AnimationState(22, 6, 100));
-    sprite->addAnimationState("idleLeft", AnimationState(70, 6, 100));
-    sprite->addAnimationState("idleRight", AnimationState(70, 6, 100, SDL_FLIP_HORIZONTAL));
+    sprite->addAnimationState("idle", AnimationState(22, 6, 60));
+    sprite->addAnimationState("idleLeft", AnimationState(70, 4, 60, SDL_FLIP_HORIZONTAL));
+    sprite->addAnimationState("idleRight", AnimationState(70, 6, 60));    
+    sprite->addAnimationState("attackingRight", AnimationState(359, 6, 60));
 
     // Set the animation
     sprite->setAnimationState("idleLeft");
@@ -71,10 +72,25 @@ std::shared_ptr<Entity> createPlayerPrefab(SDL_Renderer* renderer) {
         velocity->dx = 0;
     });
 
+    //mouse
+    input->bindMouseButtonDown(SDL_BUTTON_LEFT, [sprite](Entity& entity) {
+        if (sprite->currentState != "attackingRight") {
+            sprite->setAnimationState("attackingRight");
+        }
+    });
+
     //update
     update->addUpdateFunction([transform, velocity](Entity& entity, float deltaTime) {
         transform->setPosition({ transform->getPosition().x + velocity->dx * deltaTime,
                                 transform->getPosition().y + velocity->dy * deltaTime });
+    });
+
+    //update animations
+    update->addUpdateFunction([sprite, transform, velocity](Entity& entity, float deltaTime) {
+        if (!sprite->animationPlaying && sprite->currentState == "attackingRight") {
+            sprite->setAnimationState("idleRight");
+        }
+
     });
 
     // Return the created player entity
