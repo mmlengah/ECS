@@ -5,6 +5,7 @@
 #include <typeindex>
 #include <memory>
 #include <functional>
+#include <algorithm>
 #include <SDL.h>
 #include <SDL_image.h>
 #include "PCM.h"
@@ -143,24 +144,150 @@ private:
 
 class AnimationState {
 public:
-    int yOffset;
+    int beginFrameIndex;
     int frameCount;
     Uint32 frameDelay;
     SDL_RendererFlip flip;
 
-    AnimationState(int yOffset = 0, int frameCount = 0, Uint32 frameDelay = 0, SDL_RendererFlip flip = SDL_FLIP_NONE)
-        : yOffset(yOffset), frameCount(frameCount), frameDelay(frameDelay), flip(flip) {}
+    AnimationState(int beginFrameIndex = 1, int frameCount = 0, Uint32 frameDelay = 60, SDL_RendererFlip flip = SDL_FLIP_NONE)
+        : beginFrameIndex(beginFrameIndex - 1), frameCount(frameCount), frameDelay(frameDelay), flip(flip) {}
+};
+
+class SpriteHandler {
+public:
+    SpriteHandler() : Y_THRESHOLD(10) {}
+    std::vector<SDL_Rect> CCL(const std::string& imagePath, int tolerance = 12, int yThreshold = 10) {
+        Y_THRESHOLD = yThreshold;
+        SDL_Surface* surface = IMG_Load(imagePath.c_str());
+        if (!surface) {
+            std::cerr << "Failed to load image: " << IMG_GetError() << "\n";
+            return {};
+        }
+
+        std::vector<std::vector<int>> labels(surface->w, std::vector<int>(surface->h, 0));
+        std::vector<SDL_Rect> bounds(surface->w * surface->h, { surface->w, surface->h, 0, 0 });
+
+        int currentLabel = 1;
+
+        for (int y = 0; y < surface->h; ++y) {
+            for (int x = 0; x < surface->w; ++x) {
+                if (!isBackground(surface, x, y)) {
+                    std::vector<int> neighborLabels;
+
+                    for (int i = -tolerance; i <= tolerance; i++) {
+                        for (int j = -tolerance; j <= tolerance; j++) {
+                            int nx = x + i;
+                            int ny = y + j;
+                            if (nx >= 0 && ny >= 0 && nx < surface->w && ny < surface->h) {
+                                if (labels[nx][ny] != 0) {
+                                    neighborLabels.push_back(labels[nx][ny]);
+                                }
+                            }
+                        }
+                    }
+
+                    int label;
+                    if (neighborLabels.empty()) {
+                        label = currentLabel++;
+                        bounds[label].x = x;
+                        bounds[label].y = y;
+                        bounds[label].w = x;
+                        bounds[label].h = y;
+                    }
+                    else {
+                        label = *min_element(neighborLabels.begin(), neighborLabels.end());
+
+                        for (int otherLabel : neighborLabels) {
+                            if (otherLabel != label) {
+                                // Merge bounding rectangles
+                                bounds[label].x = std::min(bounds[label].x, bounds[otherLabel].x);
+                                bounds[label].y = std::min(bounds[label].y, bounds[otherLabel].y);
+                                bounds[label].w = std::max(bounds[label].w, bounds[otherLabel].w);
+                                bounds[label].h = std::max(bounds[label].h, bounds[otherLabel].h);
+
+                                // Replace all instances of 'otherLabel' in the image with 'label'
+                                for (auto& row : labels) {
+                                    std::replace(row.begin(), row.end(), otherLabel, label);
+                                }
+                            }
+                        }
+                    }
+
+                    // Update bounding rectangle
+                    bounds[label].x = std::min(bounds[label].x, x);
+                    bounds[label].y = std::min(bounds[label].y, y);
+                    bounds[label].w = std::max(bounds[label].w, x);
+                    bounds[label].h = std::max(bounds[label].h, y);
+
+                    labels[x][y] = label;
+                }
+            }
+        }
+
+        // Transform 'bounds' to a list of 'sprites'
+        std::vector<SDL_Rect> sprites;
+        for (int i = 1; i < currentLabel; ++i) {
+            sprites.push_back({ bounds[i].x, bounds[i].y, bounds[i].w - bounds[i].x + 1, bounds[i].h - bounds[i].y + 1 });
+        }
+
+        SDL_FreeSurface(surface);
+        std::sort(sprites.begin(), sprites.end(), [this](const SDL_Rect& a, const SDL_Rect& b) {return compareSprites(a, b); });
+
+        return sprites;
+    }
+private:
+    struct Point {
+        int x;
+        int y;
+
+        Point() : x(0), y(0) {}
+
+        friend std::ostream& operator<<(std::ostream& os, const Point& point) {
+            os << "x: " << point.x << ", y: " << point.y;
+            return os;
+        }
+    };
+
+    bool isBackground(SDL_Surface* surface, int x, int y) {
+        // This function returns true if the pixel at (x, y) is transparent.
+
+        // Make sure we're within the surface bounds
+        if (x < 0 || y < 0 || x >= surface->w || y >= surface->h) {
+            return true;
+        }
+
+        // First, get a pointer to the pixel.
+        Uint32* pixels = (Uint32*)surface->pixels;
+        Uint32 pixel = pixels[(y * surface->w) + x];
+
+        // Then, get the RGBA values of the pixel.
+        Uint8 r, g, b, a;
+        SDL_GetRGBA(pixel, surface->format, &r, &g, &b, &a);
+
+        // Return true if the alpha value is 0 (fully transparent).
+        return a == 0;
+    }
+
+    bool compareSprites(const SDL_Rect& a, const SDL_Rect& b) {
+        // If the y-coordinates are within the threshold, sort by the x-coordinate
+        if (std::abs(a.y - b.y) <= Y_THRESHOLD) {
+            return a.x < b.x;
+        }
+        // Otherwise, sort by the y-coordinate
+        return a.y < b.y;
+    }
+private:
+    int Y_THRESHOLD;
 };
 
 class SpriteComponent : public Component {
 public:
     SDL_Texture* spriteSheet;
+    std::vector<SDL_Rect> frames;
     SDL_Rect srcRect;
-    SDL_Rect dstRect;
-    int frameCount;
+    int startingFrame;
     int currentFrame;
-    int frameWidth;
-    int xOffset;
+    int frameCount;
     Uint32 lastFrameTime;
     Uint32 frameDelay;
     SDL_RendererFlip flip;
@@ -168,18 +295,24 @@ public:
     std::string currentState;
     bool animationPlaying;
 
-    SpriteComponent(SDL_Renderer* renderer, const char* path, SDL_Rect spriteRect, int frames = 0,
-        int frameWidth = 0, Uint32 frameDelay = 0)
-        : srcRect(spriteRect), dstRect({ 0, 0, spriteRect.w * 2, spriteRect.h * 2 }),
-        frameCount(frames), currentFrame(0), frameWidth(frameWidth), xOffset(spriteRect.x),
-        lastFrameTime(0), frameDelay(frameDelay), flip(SDL_FLIP_NONE), animationPlaying(false) {
+    SpriteComponent(SDL_Renderer* renderer, const char* path, int tolerance = 12, 
+        int yThreshold = 10)
+        : startingFrame(0), currentFrame(0), lastFrameTime(0), 
+        frameDelay(100), flip(SDL_FLIP_NONE), animationPlaying(false) {
         spriteSheet = IMG_LoadTexture(renderer, path);
+        //TODO: add frames
+        spriteHandler = new SpriteHandler();
+        frames = spriteHandler->CCL(path, tolerance, yThreshold);
+        std::cout << "frames: " << frames.size() << std::endl;
+        frameCount = static_cast<int>(frames.size());
+        srcRect = frames[0];
     }
 
     ~SpriteComponent() {
         if (spriteSheet) {
             SDL_DestroyTexture(spriteSheet);
         }
+        delete spriteHandler;
     }
 
     void addAnimationState(const std::string& stateName, AnimationState state) {
@@ -192,22 +325,15 @@ public:
             animationPlaying = true;
             currentState = stateName;
             AnimationState& state = it->second;
-            srcRect.y = state.yOffset;
+            startingFrame = state.beginFrameIndex;
+            currentFrame = state.beginFrameIndex;            
             frameCount = state.frameCount;
             frameDelay = state.frameDelay;
-            flip = state.flip;  // New line to set flip status
-            currentFrame = 0;
+            flip = state.flip; 
         }
         else {
-            // Handle error: No such state exists
             std::cerr << "No such animation state exists: " << stateName << std::endl;
         }
-    }
-
-    void render(SDL_Renderer* renderer, int x, int y) {
-        dstRect.x = x - dstRect.w;
-        dstRect.y = y - dstRect.h;
-        SDL_RenderCopy(renderer, spriteSheet, &srcRect, &dstRect);
     }
 
     void nextFrame() {
@@ -216,17 +342,27 @@ public:
 
         // If enough time has passed since the last frame...
         if (currentTime > lastFrameTime + frameDelay) {
-            // Update the frame.
-            currentFrame = (currentFrame + 1) % frameCount;
-            srcRect.x = xOffset + (currentFrame * frameWidth);
+            // Update the frame only if the animation is already playing.
+            currentFrame = (currentFrame + 1 - startingFrame) % frameCount + startingFrame;
+            
+            srcRect = frames[currentFrame];
+
             // Set the time of this frame.
             lastFrameTime = currentTime;
 
-            if (currentFrame == frameCount - 1) {
-                animationPlaying = false;
+            auto it = animationStates.find(currentState);
+            if (it != animationStates.end()) {
+                AnimationState& state = it->second;
+                // Check if we've reached the end of the animation.
+                if (currentFrame - startingFrame + 1 >= state.frameCount) {
+                    animationPlaying = false;
+                    currentFrame = state.beginFrameIndex;
+                }
             }
-        }        
+        }
     }
+private:
+    SpriteHandler* spriteHandler;
 };
 
 class VelocityComponent : public Component {
@@ -309,12 +445,24 @@ public:
     }
 };
 
+struct Rectangle {
+    int width;
+    int height;
+
+    Rectangle(int w, int h) : width(w), height(h) {}
+
+    friend std::ostream& operator<<(std::ostream& os, const Rectangle& rect) {
+        os << "Width: " << rect.width << ", Height: " << rect.height;
+        return os;
+    }
+};
+
 class SquareComponent : public Component {
 public:
-    SDL_Rect dstRect;
+    Rectangle rect;
     SDL_Color color;
 
-    SquareComponent(SDL_Rect dstRect, SDL_Color color) : dstRect(dstRect), color(color) {}
+    SquareComponent(Rectangle rect, SDL_Color color) : rect(rect), color(color) {}
 };
 
 class UpdateComponent : public Component {
@@ -349,7 +497,7 @@ public:
                 Vector2f scale = worldSpace.getScale();
                 float rot = worldSpace.getRotation();
 
-                SDL_Rect temp = sprite->dstRect;
+                SDL_Rect temp = { 0, 0, sprite->srcRect.w, sprite->srcRect.h };
 
                 temp.w = static_cast<int>(temp.w * scale.x);
                 temp.h = static_cast<int>(temp.h * scale.y);
@@ -368,14 +516,15 @@ public:
                 Vector2f pos = worldSpace.getTranslation();
                 Vector2f scale = worldSpace.getScale();
 
-                SDL_Rect temp = shape->dstRect;
+                SDL_Rect temp = { 0, 0, shape->rect.width ,shape->rect.height };
 
                 temp.w = static_cast<int>(temp.w * scale.x);
                 temp.h = static_cast<int>(temp.h * scale.y);
                 temp.x = static_cast<int>(pos.x) - temp.w / 2;
                 temp.y = static_cast<int>(pos.y) - temp.h / 2;
 
-                SDL_SetRenderDrawColor(renderer, shape->color.r, shape->color.g, shape->color.b, shape->color.a);
+                SDL_SetRenderDrawColor(renderer, shape->color.r, shape->color.g,
+                    shape->color.b, shape->color.a);
                 SDL_RenderFillRect(renderer, &temp);
             }
         }

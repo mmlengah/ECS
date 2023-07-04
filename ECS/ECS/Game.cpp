@@ -44,7 +44,7 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     
     player = createPlayerPrefab(renderer.get());
 
-    SDL_Rect a = { 0, 0, 10, 10 };
+    Rectangle a = { 10, 10 };
     SDL_Color white = { 255, 255, 255, 255 };
 
     auto box = Entity::create();
@@ -61,8 +61,7 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
 
     auto box4 = Entity::create();
     box4->addComponent<TransformComponent>(Vector2f(620, 460), 0.0f, Vector2f(2.0f, 2.0f));
-    box4->addComponent<SquareComponent>(a, white);
-    
+    box4->addComponent<SquareComponent>(a, white);    
 
     systemManager->addAllEntitiesToSystems(Entity::getAllEntities());
 
