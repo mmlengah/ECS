@@ -11,6 +11,15 @@
 #include "PCM.h"
 #include "Camera.h"
 
+/*
+TODO:
+Collision
+Sound
+Light
+Particles
+Physics
+*/
+
 using namespace PC;
 
 class Entity;
@@ -149,8 +158,8 @@ public:
     Uint32 frameDelay;
     SDL_RendererFlip flip;
 
-    AnimationState(int beginFrameIndex = 1, int frameCount = 0, Uint32 frameDelay = 60, SDL_RendererFlip flip = SDL_FLIP_NONE)
-        : beginFrameIndex(beginFrameIndex - 1), frameCount(frameCount), frameDelay(frameDelay), flip(flip) {}
+    AnimationState(int beginFrameIndex = 0, int frameCount = 0, Uint32 frameDelay = 60, SDL_RendererFlip flip = SDL_FLIP_NONE)
+        : beginFrameIndex(beginFrameIndex), frameCount(frameCount), frameDelay(frameDelay), flip(flip) {}
 };
 
 class SpriteHandler {
@@ -299,8 +308,12 @@ public:
         int yThreshold = 10)
         : startingFrame(0), currentFrame(0), lastFrameTime(0), 
         frameDelay(100), flip(SDL_FLIP_NONE), animationPlaying(false) {
+
         spriteSheet = IMG_LoadTexture(renderer, path);
-        //TODO: add frames
+        if (!spriteSheet) {
+            std::cerr << "Failed to load texture: " << IMG_GetError() << "\n";
+        }
+
         spriteHandler = new SpriteHandler();
         frames = spriteHandler->CCL(path, tolerance, yThreshold);
         std::cout << "frames: " << frames.size() << std::endl;
@@ -320,6 +333,7 @@ public:
     }
 
     void setAnimationState(const std::string& stateName) {
+        if (currentState == stateName) { return; }
         auto it = animationStates.find(stateName);
         if (it != animationStates.end()) {
             animationPlaying = true;
@@ -342,9 +356,10 @@ public:
 
         // If enough time has passed since the last frame...
         if (currentTime > lastFrameTime + frameDelay) {
-            // Update the frame only if the animation is already playing.
-            currentFrame = (currentFrame + 1 - startingFrame) % frameCount + startingFrame;
-            
+            //std::cout << currentFrame << std::endl;
+
+            currentFrame = (currentFrame - startingFrame + 1) % frameCount + startingFrame;
+
             srcRect = frames[currentFrame];
 
             // Set the time of this frame.
@@ -356,7 +371,8 @@ public:
                 // Check if we've reached the end of the animation.
                 if (currentFrame - startingFrame + 1 >= state.frameCount) {
                     animationPlaying = false;
-                    currentFrame = state.beginFrameIndex;
+                    //std::cout << currentFrame << std::endl;
+                    currentFrame = state.beginFrameIndex;                    
                 }
             }
         }
