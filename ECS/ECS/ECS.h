@@ -35,9 +35,12 @@ private:
     Entity() {}
 
 public:
-    template<typename T, typename... TArgs>
-    void addComponent(TArgs&&... args) {
-        components[typeid(T)] = std::make_unique<T>(std::forward<TArgs>(args)...);
+    template <typename T, typename... TArgs>
+    T* addComponent(TArgs&&... args) {
+        T* comp = new T(std::forward<TArgs>(args)...);
+        comp->owner = this; // Set the owner of the component to this entity
+        components[std::type_index(typeid(T))] = std::unique_ptr<T>(comp);
+        return comp;
     }
 
     template<typename T>
@@ -63,8 +66,15 @@ public:
 
 class Component {
 public:
-    Entity* entity;
+    Entity* owner;
     virtual ~Component() {}
+
+    Component() : owner(nullptr) {}
+
+    template <typename T>
+    T* getComponent() const {
+        return owner->getComponent<T>();
+    }
 };
 
 class System {
@@ -144,11 +154,24 @@ public:
             Matrix3x3<float>::Matrix3x3FromScale(scale);
     }
 
+    void setWorldSpaceMatrix(const Matrix3x3<float>& matrix) {
+        worldSpaceMatrix = matrix;
+    }
+
+    Matrix3x3<float> getWorldSpaceMatrix() {
+        return worldSpaceMatrix;
+    }
+
+    float getWorldSpaceRotation() {
+        return worldSpaceMatrix.getRotation();
+    }
+
 private:
     Vector2f position;
     float rotation;
     Vector2f scale;
     Matrix3x3<float> transformMatrix;
+    Matrix3x3<float> worldSpaceMatrix;
 };
 
 class AnimationState {
@@ -377,6 +400,22 @@ public:
             }
         }
     }
+
+    SDL_Rect getWorldSpaceRect() {
+        TransformComponent* transform = owner->getComponent<TransformComponent>();
+        Matrix3x3f m = transform->getWorldSpaceMatrix();
+
+        Vector2f pos = m.getTranslation();
+        Vector2f scale = m.getScale();
+
+        SDL_Rect temp = { static_cast<int>(pos.x), static_cast<int>(pos.y),
+            static_cast<int>(srcRect.w * scale.x), static_cast<int>(srcRect.h * scale.y) };
+        
+        temp.x = static_cast<int>(pos.x) - temp.w / 2;
+        temp.y = static_cast<int>(pos.y) - temp.h / 2;
+        
+        return temp;
+    }
 private:
     SpriteHandler* spriteHandler;
 };
@@ -465,6 +504,8 @@ struct Rectangle {
     int width;
     int height;
 
+    Rectangle() : width(0), height(0) {}
+
     Rectangle(int w, int h) : width(w), height(h) {}
 
     friend std::ostream& operator<<(std::ostream& os, const Rectangle& rect) {
@@ -479,6 +520,59 @@ public:
     SDL_Color color;
 
     SquareComponent(Rectangle rect, SDL_Color color) : rect(rect), color(color) {}
+
+    SDL_Rect getWorldSpaceRect() {
+        TransformComponent* transform = owner->getComponent<TransformComponent>();
+        Matrix3x3f m = transform->getWorldSpaceMatrix();
+
+        Vector2f pos = m.getTranslation();
+        Vector2f scale = m.getScale();
+
+        SDL_Rect temp = { static_cast<int>(pos.x), static_cast<int>(pos.y),
+            static_cast<int>(rect.width * scale.x), static_cast<int>(rect.height * scale.y) };
+        
+        temp.x = static_cast<int>(pos.x) - temp.w / 2;
+        temp.y = static_cast<int>(pos.y) - temp.h / 2;
+        
+        return temp;
+    }
+};
+
+class BoxColliderComponent : public Component {
+public:
+    BoxColliderComponent() : customCollider(false) {}
+
+    BoxColliderComponent(Rectangle rect) : rect(rect), customCollider(false) {}
+
+    SDL_Rect getWorldSpaceRect() {
+        SpriteComponent* sprite = owner->getComponent<SpriteComponent>();
+        SquareComponent* square = owner->getComponent<SquareComponent>();
+
+        if (customCollider) {            
+            TransformComponent* transform = owner->getComponent<TransformComponent>();
+            Matrix3x3f m = transform->getWorldSpaceMatrix();
+
+            Vector2f pos = m.getTranslation();
+            Vector2f scale = m.getScale();
+
+            SDL_Rect temp = { static_cast<int>(pos.x), static_cast<int>(pos.y),
+                static_cast<int>(rect.width * scale.x), static_cast<int>(rect.height * scale.y) };
+
+            return temp;
+        }
+        else if (sprite) {
+            return sprite->getWorldSpaceRect();
+        }
+        else if (square) {
+            return square->getWorldSpaceRect();
+        }
+
+        return { 0, 0, 0, 0 };
+    }
+
+private:
+    Rectangle rect;
+    bool customCollider;
 };
 
 class UpdateComponent : public Component {
@@ -493,8 +587,8 @@ public:
 class RenderSystem : public System {
 public:
     SDL_Renderer* renderer;
-    Camera* cam;
-    RenderSystem(SDL_Renderer* renderer, Camera* cam) : renderer(renderer), cam(cam) {}
+
+    RenderSystem(SDL_Renderer* renderer) : renderer(renderer) {}
 
     void update() {
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -506,43 +600,40 @@ public:
             SpriteComponent* sprite = entity->getComponent<SpriteComponent>();            
             SquareComponent* shape = entity->getComponent<SquareComponent>();
             if (sprite) {
-                Matrix3x3<float> worldSpace = cam->getTransformMatrix() *
-                    transform->getTransformMatrix();
-                
-                Vector2f pos = worldSpace.getTranslation();
-                Vector2f scale = worldSpace.getScale();
-                float rot = worldSpace.getRotation();
+                SDL_Rect temp = sprite->getWorldSpaceRect();
 
-                SDL_Rect temp = { 0, 0, sprite->srcRect.w, sprite->srcRect.h };
-
-                temp.w = static_cast<int>(temp.w * scale.x);
-                temp.h = static_cast<int>(temp.h * scale.y);
-                temp.x = static_cast<int>(pos.x) - temp.w / 2;
-                temp.y = static_cast<int>(pos.y) - temp.h / 2;
+                float rot = transform->getWorldSpaceRotation();
 
                 SDL_RenderCopyEx(renderer, sprite->spriteSheet, &(sprite->srcRect), &temp,
                     transform->getRotation(), nullptr, sprite->flip);
                 sprite->nextFrame();
+
+                BoxColliderComponent* boxCollider = entity->getComponent<BoxColliderComponent>();
+                if (boxCollider) {
+                    SDL_Rect rect = boxCollider->getWorldSpaceRect();
+
+                    SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);
+                    SDL_RenderDrawRect(renderer, &rect);
+                }
             }
             else if (shape) {
-                // render shape
-                Matrix3x3<float> worldSpace = cam->getTransformMatrix() *
-                    transform->getTransformMatrix();
+                SDL_Rect temp = shape->getWorldSpaceRect();
 
-                Vector2f pos = worldSpace.getTranslation();
-                Vector2f scale = worldSpace.getScale();
-
-                SDL_Rect temp = { 0, 0, shape->rect.width ,shape->rect.height };
-
-                temp.w = static_cast<int>(temp.w * scale.x);
-                temp.h = static_cast<int>(temp.h * scale.y);
-                temp.x = static_cast<int>(pos.x) - temp.w / 2;
-                temp.y = static_cast<int>(pos.y) - temp.h / 2;
+                float rot = transform->getWorldSpaceRotation();
 
                 SDL_SetRenderDrawColor(renderer, shape->color.r, shape->color.g,
                     shape->color.b, shape->color.a);
                 SDL_RenderFillRect(renderer, &temp);
+
+                BoxColliderComponent* boxCollider = entity->getComponent<BoxColliderComponent>();
+                if (boxCollider) {
+                    SDL_Rect rect = boxCollider->getWorldSpaceRect();
+
+                    SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);
+                    SDL_RenderDrawRect(renderer, &rect);
+                }
             }
+            
         }
 
         SDL_RenderPresent(renderer);
@@ -624,6 +715,31 @@ public:
 
     void tryAddEntity(Entity* entity) override {
         if (entity->getComponent<UpdateComponent>()) {
+            entities.push_back(entity);
+        }
+    }
+};
+
+class WorldSpaceSystem : public System {
+public:
+    Camera* cam;
+
+    WorldSpaceSystem(Camera* cam) : cam(cam) {}
+
+    void update() {
+        for (auto it = entities.begin(); it != entities.end(); ++it) {
+            Entity* entity = *it;
+            TransformComponent* transform = entity->getComponent<TransformComponent>();
+            if (transform) {
+                Matrix3x3<float> worldSpace = cam->getTransformMatrix() *
+                    transform->getTransformMatrix();
+                transform->setWorldSpaceMatrix(worldSpace);
+            }
+        }
+    }
+
+    void tryAddEntity(Entity* entity) override {
+        if (entity->getComponent<TransformComponent>()) {
             entities.push_back(entity);
         }
     }

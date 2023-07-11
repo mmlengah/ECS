@@ -38,9 +38,10 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
 
     systemManager = std::make_unique<SystemManager>();
 
-    renderSystem = &(systemManager->registerSystem<RenderSystem>(renderer.get(), cam));
+    renderSystem = &(systemManager->registerSystem<RenderSystem>(renderer.get()));
     inputSystem = &(systemManager->registerSystem<InputSystem>());
     updateSystem = &(systemManager->registerSystem<UpdateSystem>());
+    worldSpaceSystem = &(systemManager->registerSystem<WorldSpaceSystem>(cam));
     
     player = createPlayerPrefab(renderer.get());
 
@@ -50,6 +51,7 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     auto box = Entity::create();
     box->addComponent<TransformComponent>(Vector2f(0, 0), 0.0f, Vector2f(2.0f, 2.0f));
     box->addComponent<SquareComponent>(a, white);
+    box->addComponent<BoxColliderComponent>();
 
     auto box2 = Entity::create();
     box2->addComponent<TransformComponent>(Vector2f(620, 0), 0.0f, Vector2f(3.0f, 3.0f));
@@ -60,7 +62,7 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     box3->addComponent<SquareComponent>(a, white);
 
     auto box4 = Entity::create();
-    box4->addComponent<TransformComponent>(Vector2f(620, 460), 0.0f, Vector2f(2.0f, 2.0f));
+    box4->addComponent<TransformComponent>(Vector2f(620, 460), 0.0f, Vector2f(20.0f, 20.0f));
     box4->addComponent<SquareComponent>(a, white);    
 
     systemManager->addAllEntitiesToSystems(Entity::getAllEntities());
@@ -99,6 +101,7 @@ void Game::Update()
 {
     cam->lookAt(player->getComponent<TransformComponent>()->getPosition());
     updateSystem->update(deltaTime);
+    worldSpaceSystem->update();
 }
 
 void Game::Render()

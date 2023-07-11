@@ -27,6 +27,7 @@ private:
     RenderSystem* renderSystem;
     InputSystem* inputSystem;        
     UpdateSystem* updateSystem;
+    WorldSpaceSystem* worldSpaceSystem;
     Camera* cam;
     std::shared_ptr<Entity> player;
 };

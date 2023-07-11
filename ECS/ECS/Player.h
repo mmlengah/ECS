@@ -17,6 +17,7 @@ std::shared_ptr<Entity> createPlayerPrefab(SDL_Renderer* renderer) {
     player->addComponent<VelocityComponent>(100, 100);  
     player->addComponent<InputComponent>();
     player->addComponent<UpdateComponent>();
+    player->addComponent<BoxColliderComponent>();
 
     // Get the InputComponent and bind keys to commands
     InputComponent* input = player->getComponent<InputComponent>();
