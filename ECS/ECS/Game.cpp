@@ -5,7 +5,7 @@
 
 Game::Game() : quit(false), oldTime(0), currentTime(0), deltaTime(0), win(nullptr, SDL_DestroyWindow),
 renderer(nullptr, SDL_DestroyRenderer), renderSystem(nullptr), inputSystem(nullptr),
-updateSystem(nullptr), cam(nullptr), player(nullptr)
+updateSystem(nullptr), worldSpaceSystem(nullptr), collisionSystem(nullptr), cam(nullptr), player(nullptr)
 {
 
 }
@@ -15,6 +15,8 @@ Game::~Game()
     delete renderSystem;
     delete inputSystem;
     delete updateSystem;
+    delete worldSpaceSystem;
+    delete collisionSystem;
     delete cam;
     SDL_Quit();
 }
@@ -42,6 +44,7 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     inputSystem = &(systemManager->registerSystem<InputSystem>());
     updateSystem = &(systemManager->registerSystem<UpdateSystem>());
     worldSpaceSystem = &(systemManager->registerSystem<WorldSpaceSystem>(cam));
+    collisionSystem = &(systemManager->registerSystem<CollisionSystem>());
     
     player = createPlayerPrefab(renderer.get());
 
@@ -56,14 +59,17 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     auto box2 = Entity::create();
     box2->addComponent<TransformComponent>(Vector2f(620, 0), 0.0f, Vector2f(3.0f, 3.0f));
     box2->addComponent<SquareComponent>(a, white);
+    box2->addComponent<BoxColliderComponent>();
 
     auto box3 = Entity::create();
     box3->addComponent<TransformComponent>(Vector2f(0, 460), 0.0f, Vector2f(2.0f, 2.0f));
     box3->addComponent<SquareComponent>(a, white);
+    box3->addComponent<BoxColliderComponent>();
 
     auto box4 = Entity::create();
     box4->addComponent<TransformComponent>(Vector2f(620, 460), 0.0f, Vector2f(20.0f, 20.0f));
     box4->addComponent<SquareComponent>(a, white);    
+    box4->addComponent<BoxColliderComponent>();
 
     systemManager->addAllEntitiesToSystems(Entity::getAllEntities());
 
@@ -101,6 +107,7 @@ void Game::Update()
 {
     cam->lookAt(player->getComponent<TransformComponent>()->getPosition());
     updateSystem->update(deltaTime);
+    collisionSystem->update();
     worldSpaceSystem->update();
 }
 

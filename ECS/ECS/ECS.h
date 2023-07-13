@@ -162,6 +162,10 @@ public:
         return worldSpaceMatrix;
     }
 
+    Vector2f getWorldSpacePosition() {
+        return worldSpaceMatrix.getTranslation();
+    }
+
     float getWorldSpaceRotation() {
         return worldSpaceMatrix.getRotation();
     }
@@ -743,4 +747,57 @@ public:
             entities.push_back(entity);
         }
     }
+};
+
+class CollisionSystem : public System {
+public:
+    void update() {
+        for (int i = 0; i < entities.size(); i++) {
+            for (int j = i + 1; j < entities.size(); j++) {
+                checkAndResolveCollision(entities[i], entities[j]);
+            }
+        }
+    }
+
+    void tryAddEntity(Entity* entity) override {
+        if (entity->getComponent<BoxColliderComponent>()) {
+            entities.push_back(entity);
+        }
+    }
+
+private:
+    void checkAndResolveCollision(Entity* entityA, Entity* entityB) {
+        BoxColliderComponent* boxA = entityA->getComponent<BoxColliderComponent>();
+        BoxColliderComponent* boxB = entityB->getComponent<BoxColliderComponent>();
+
+        SDL_Rect rectA = boxA->getWorldSpaceRect();
+        SDL_Rect rectB = boxB->getWorldSpaceRect();
+
+        if (SDL_HasIntersection(&rectA, &rectB)) {
+            // Assuming entityA is the player and entityB is the wall
+
+            // Get the player's transform component
+            TransformComponent* transformA = entityA->getComponent<TransformComponent>();
+
+            // Calculate the depth of the intersection on both axes
+            int xOverlap = std::min(rectA.x + rectA.w, rectB.x + rectB.w) - std::max(rectA.x, rectB.x);
+            int yOverlap = std::min(rectA.y + rectA.h, rectB.y + rectB.h) - std::max(rectA.y, rectB.y);
+
+            // Resolve collision by pushing the player out of the wall
+            // The player is moved out of the collision along the axis of least overlap
+            Vector2f t = transformA->getPosition();
+            if (xOverlap < yOverlap) {
+                // Move player left or right out of collision
+                if (rectA.x < rectB.x) t.x -= xOverlap;  // Move left
+                else t.x += xOverlap;  // Move right
+            }
+            else {
+                // Move player up or down out of collision
+                if (rectA.y < rectB.y) t.y -= yOverlap;  // Move up
+                else t.y += yOverlap;  // Move down
+            }
+            transformA->setPosition(t);
+        }
+    }
+
 };
