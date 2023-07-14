@@ -48,67 +48,48 @@ std::shared_ptr<Entity> createPlayerPrefab(SDL_Renderer* renderer) {
     input->bindKeyDown(SDLK_w, [velocity, sprite](Entity& entity) {        
         if (sprite->currentState != "attackingRight" && sprite->currentState != "attackingLeft"
             && sprite->currentState != "attackingFront" && sprite->currentState != "attackingBack") {
-            sprite->setAnimationState("walkingBack");
             velocity->dy = -velocity->dyMax;
         }        
     });
 
     input->bindKeyUp(SDLK_w, [velocity, sprite](Entity& entity) {
         velocity->dy = 0;
-        if (sprite->currentState != "attackingRight" && sprite->currentState != "attackingLeft"
-            && sprite->currentState != "attackingFront" && sprite->currentState != "attackingBack") {
-            sprite->setAnimationState("idleBack");
-        }
-        });
+    });
 
     //downwards movement
     input->bindKeyDown(SDLK_s, [velocity, sprite](Entity& entity) {        
         if (sprite->currentState != "attackingRight" && sprite->currentState != "attackingLeft"
             && sprite->currentState != "attackingFront" && sprite->currentState != "attackingBack") {
-            sprite->setAnimationState("walkingFront");
             velocity->dy = velocity->dyMax;
         }
-        });
+    });
 
     input->bindKeyUp(SDLK_s, [velocity, sprite](Entity& entity) {
         velocity->dy = 0;
-        if (sprite->currentState != "attackingRight" && sprite->currentState != "attackingLeft"
-            && sprite->currentState != "attackingFront" && sprite->currentState != "attackingBack") {
-            sprite->setAnimationState("idleFront");
-        }
-        });
+    });
 
     //left movement
     input->bindKeyDown(SDLK_a, [velocity, sprite](Entity& entity) {        
         if (sprite->currentState != "attackingRight" && sprite->currentState != "attackingLeft"
             && sprite->currentState != "attackingFront" && sprite->currentState != "attackingBack") {
-            sprite->setAnimationState("walkingLeft");
             velocity->dx = -velocity->dxMax;
         }
-        });
+    });
 
     input->bindKeyUp(SDLK_a, [velocity, sprite](Entity& entity) {
         velocity->dx = 0;
-        if (sprite->currentState != "attackingRight" && sprite->currentState != "attackingLeft"
-            && sprite->currentState != "attackingFront" && sprite->currentState != "attackingBack") {
-            sprite->setAnimationState("idleLeft");
-        }
-        });
+    });
 
     //right movement
     input->bindKeyDown(SDLK_d, [velocity, sprite](Entity& entity) {        
         if (sprite->currentState != "attackingRight" && sprite->currentState != "attackingLeft"
             && sprite->currentState != "attackingFront" && sprite->currentState != "attackingBack") {
-            sprite->setAnimationState("walkingRight");
             velocity->dx = velocity->dxMax;
         }
     });
 
     input->bindKeyUp(SDLK_d, [velocity, sprite](Entity& entity) {
         velocity->dx = 0;
-        if (sprite->currentState != "attackingRight") {
-            sprite->setAnimationState("idleRight");
-        }
     });
 
     //mouse
@@ -137,22 +118,38 @@ std::shared_ptr<Entity> createPlayerPrefab(SDL_Renderer* renderer) {
                                 transform->getPosition().y + velocity->dy * deltaTime });
     });
 
-    //update animations
     update->addUpdateFunction([sprite, transform, velocity](Entity& entity, float deltaTime) {
-        if (!sprite->animationPlaying && sprite->currentState == "attackingRight") {
-            sprite->setAnimationState("idleRight");
+        // Determine the direction of movement based on the velocity
+        if (velocity->dx > 0) {
+            // Moving right
+            sprite->setAnimationState(!sprite->animationPlaying && sprite->currentState == "attackingRight" ? "idleRight" : "walkingRight");
         }
-        else if (!sprite->animationPlaying && sprite->currentState == "attackingLeft") {
-            sprite->setAnimationState("idleLeft");
+        else if (velocity->dx < 0) {
+            // Moving left
+            sprite->setAnimationState(!sprite->animationPlaying && sprite->currentState == "attackingLeft" ? "idleLeft" : "walkingLeft");
         }
-        else if (!sprite->animationPlaying && sprite->currentState == "attackingFront") {
-            sprite->setAnimationState("idleFront");
+        else if (velocity->dy > 0) {
+            // Moving down
+            sprite->setAnimationState(!sprite->animationPlaying&& sprite->currentState == "attackingFront" ? "idleFront" : "walkingFront");
         }
-        else if (!sprite->animationPlaying && sprite->currentState == "attackingBack") {
-            sprite->setAnimationState("idleBack");
+        else if (velocity->dy < 0) {
+            // Moving up
+            sprite->setAnimationState(!sprite->animationPlaying && sprite->currentState == "attackingBack" ? "idleBack" : "walkingBack");
         }
-
-
+        else if (!sprite->animationPlaying) {
+            if (sprite->currentState == "attackingRight" || sprite->currentState == "walkingRight") {
+                sprite->setAnimationState("idleRight");
+            }
+            else if (sprite->currentState == "attackingLeft" || sprite->currentState == "walkingLeft") {
+                sprite->setAnimationState("idleLeft");
+            }
+            else if (sprite->currentState == "attackingFront" || sprite->currentState == "walkingFront") {
+                sprite->setAnimationState("idleFront");
+            }
+            else if (sprite->currentState == "attackingBack" || sprite->currentState == "walkingBack") {
+                sprite->setAnimationState("idleBack");
+            }
+        }
     });
 
     // Return the created player entity
