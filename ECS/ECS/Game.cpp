@@ -2,10 +2,12 @@
 #include <SDL_image.h>
 #include "ECS.h"
 #include "Player.h"
+#include <iostream>
 
 Game::Game() : quit(false), oldTime(0), currentTime(0), deltaTime(0), win(nullptr, SDL_DestroyWindow),
 renderer(nullptr, SDL_DestroyRenderer), renderSystem(nullptr), inputSystem(nullptr),
-updateSystem(nullptr), worldSpaceSystem(nullptr), collisionSystem(nullptr), cam(nullptr), player(nullptr)
+updateSystem(nullptr), worldSpaceSystem(nullptr), collisionSystem(nullptr), physicsSystem(nullptr),
+cam(nullptr), player(nullptr)
 {
 
 }
@@ -17,6 +19,7 @@ Game::~Game()
     delete updateSystem;
     delete worldSpaceSystem;
     delete collisionSystem;
+    delete physicsSystem;
     delete cam;
     SDL_Quit();
 }
@@ -45,6 +48,7 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     updateSystem = &(systemManager->registerSystem<UpdateSystem>());
     worldSpaceSystem = &(systemManager->registerSystem<WorldSpaceSystem>(cam));
     collisionSystem = &(systemManager->registerSystem<CollisionSystem>());
+    physicsSystem = &(systemManager->registerSystem<PhysicsSystem>());
     
     player = createPlayerPrefab(renderer.get());
 
@@ -70,6 +74,51 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     box4->addComponent<TransformComponent>(Vector2f(620, 460), 0.0f, Vector2f(20.0f, 20.0f));
     box4->addComponent<SquareComponent>(a, white);    
     box4->addComponent<BoxColliderComponent>();
+
+    SDL_Color blue = { 0, 0, 255, 255 };
+    auto box5 = Entity::create();
+    box5->addComponent<TransformComponent>(Vector2f(120, 40), 0.0f, Vector2f(4.0f, 4.0f));
+    box5->addComponent<SquareComponent>(a, blue);
+    box5->addComponent<BoxColliderComponent>();
+    box5->addComponent<UpdateComponent>();
+    box5->addComponent<PhysicsComponent>(40.f, false);
+    UpdateComponent* box5update = box5->getComponent<UpdateComponent>();
+    PhysicsComponent* box5physics = box5->getComponent<PhysicsComponent>();
+    BoxColliderComponent* box5BoxCollider = box5->getComponent<BoxColliderComponent>();
+
+    auto speed = std::make_shared<float>(1000.0f);
+
+    box5update->addUpdateFunction([speed, box5physics](Entity& entity, float deltaTime) {
+        if (*speed > 0) {
+            box5physics->applyForce(Vector2f(*speed, 0.0f) * deltaTime);
+        }        
+    });
+
+    box5BoxCollider->addCollisionHandler([speed, box5physics](Entity* self, Entity* other) {
+        *speed = 0;
+        box5physics->isAffectedByGravity = true;
+    });
+
+    auto box6= Entity::create();
+    box6->addComponent<TransformComponent>(Vector2f(520, 40), 0.0f, Vector2f(2.0f, 2.0f));
+    box6->addComponent<SquareComponent>(a, blue);
+    box6->addComponent<BoxColliderComponent>();
+    box6->addComponent<UpdateComponent>();
+    box6->addComponent<PhysicsComponent>(10.f, false);
+    UpdateComponent* box6update = box6->getComponent<UpdateComponent>();
+    PhysicsComponent* box6physics = box6->getComponent<PhysicsComponent>();
+    BoxColliderComponent* box6BoxCollider = box6->getComponent<BoxColliderComponent>();
+
+    box6update->addUpdateFunction([speed, box6physics](Entity& entity, float deltaTime) {
+        if (*speed > 0) {
+            box6physics->applyForce(Vector2f(-(*speed), 0.0f) * deltaTime);
+        }
+        
+    });
+
+    box6BoxCollider->addCollisionHandler([speed, box6physics](Entity* self, Entity* other) {
+        box6physics->isAffectedByGravity = true;
+    });
 
     systemManager->addAllEntitiesToSystems(Entity::getAllEntities());
 
@@ -108,6 +157,7 @@ void Game::Update()
     cam->lookAt(player->getComponent<TransformComponent>()->getPosition());
     updateSystem->update(deltaTime);
     collisionSystem->update();
+    physicsSystem->update(deltaTime);    
     worldSpaceSystem->update();
 }
 

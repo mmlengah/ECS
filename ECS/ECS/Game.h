@@ -29,6 +29,7 @@ private:
     UpdateSystem* updateSystem;
     WorldSpaceSystem* worldSpaceSystem;
     CollisionSystem* collisionSystem;
+    PhysicsSystem* physicsSystem;
     Camera* cam;
     std::shared_ptr<Entity> player;
 };

@@ -574,9 +574,41 @@ public:
         return { 0, 0, 0, 0 };
     }
 
+    void addCollisionHandler(std::function<void(Entity*, Entity*)> handler) {
+        collisionHandlers.push_back(handler);
+    }
+
+    void handleCollision(Entity* other) {
+        for (const auto& handler : collisionHandlers) {
+            handler(owner, other);
+        }
+    }
+
 private:
     Rectangle rect;
     bool customCollider;
+
+    std::vector<std::function<void(Entity*, Entity*)>> collisionHandlers;
+};
+
+class PhysicsComponent : public Component {
+public:
+    Vector2f velocity;
+    Vector2f acceleration;
+    float mass;
+    bool isStatic;
+    bool isAffectedByGravity;
+    float damping = 0.99f;
+
+    PhysicsComponent(float mass, bool isAffectedByGravity = true, bool isStatic = false)
+        : mass(mass), isAffectedByGravity(isAffectedByGravity), isStatic(isStatic),
+        velocity(0, 0), acceleration(0, 0) {}
+
+    void applyForce(const Vector2f& force) {
+        if (!isStatic) {
+            acceleration += force / mass;
+        }
+    }
 };
 
 class UpdateComponent : public Component {
@@ -760,7 +792,7 @@ public:
     }
 
     void tryAddEntity(Entity* entity) override {
-        if (entity->getComponent<BoxColliderComponent>()) {
+        if (entity->getComponent<BoxColliderComponent>() && entity->getComponent<PhysicsComponent>()) {
             entities.push_back(entity);
         }
     }
@@ -769,6 +801,8 @@ private:
     void checkAndResolveCollision(Entity* entityA, Entity* entityB) {
         BoxColliderComponent* boxA = entityA->getComponent<BoxColliderComponent>();
         BoxColliderComponent* boxB = entityB->getComponent<BoxColliderComponent>();
+        PhysicsComponent* physicsA = entityA->getComponent<PhysicsComponent>();
+        PhysicsComponent* physicsB = entityB->getComponent<PhysicsComponent>();
 
         SDL_Rect rectA = boxA->getWorldSpaceRect();
         SDL_Rect rectB = boxB->getWorldSpaceRect();
@@ -776,28 +810,98 @@ private:
         if (SDL_HasIntersection(&rectA, &rectB)) {
             // Assuming entityA is the player and entityB is the wall
 
-            // Get the player's transform component
+            // Get the entities' transform components
             TransformComponent* transformA = entityA->getComponent<TransformComponent>();
+            TransformComponent* transformB = entityB->getComponent<TransformComponent>();
 
             // Calculate the depth of the intersection on both axes
             int xOverlap = std::min(rectA.x + rectA.w, rectB.x + rectB.w) - std::max(rectA.x, rectB.x);
             int yOverlap = std::min(rectA.y + rectA.h, rectB.y + rectB.h) - std::max(rectA.y, rectB.y);
 
-            // Resolve collision by pushing the player out of the wall
-            // The player is moved out of the collision along the axis of least overlap
-            Vector2f t = transformA->getPosition();
-            if (xOverlap < yOverlap) {
-                // Move player left or right out of collision
-                if (rectA.x < rectB.x) t.x -= xOverlap;  // Move left
-                else t.x += xOverlap;  // Move right
+            Vector2f tA = transformA->getPosition();
+            Vector2f tB = transformB->getPosition();
+
+            // Resolve collision by pushing the entities out of collision along the axis of least overlap
+            // Only if the entity is not static
+            float totalMass = physicsA->mass + physicsB->mass;
+            if (!physicsA->isStatic) {
+                if (xOverlap < yOverlap) {
+                    if (rectA.x < rectB.x) tA.x -= xOverlap * (physicsB->mass / totalMass);
+                    else tA.x += xOverlap * (physicsB->mass / totalMass);
+                }
+                else {
+                    if (rectA.y < rectB.y) tA.y -= yOverlap * (physicsB->mass / totalMass);
+                    else tA.y += yOverlap * (physicsB->mass / totalMass);
+                }
             }
-            else {
-                // Move player up or down out of collision
-                if (rectA.y < rectB.y) t.y -= yOverlap;  // Move up
-                else t.y += yOverlap;  // Move down
+
+            if (!physicsB->isStatic) {
+                if (xOverlap < yOverlap) {
+                    if (rectB.x < rectA.x) tB.x -= xOverlap * (physicsA->mass / totalMass);
+                    else tB.x += xOverlap * (physicsA->mass / totalMass);
+                }
+                else {
+                    if (rectB.y < rectA.y) tB.y -= yOverlap * (physicsA->mass / totalMass);
+                    else tB.y += yOverlap * (physicsA->mass / totalMass);
+                }
             }
-            transformA->setPosition(t);
+
+            transformA->setPosition(tA);
+            transformB->setPosition(tB);
+
+            // After separating entities, apply conservation of momentum to calculate new velocities
+            if (!physicsA->isStatic || !physicsB->isStatic) {
+                Vector2f velocityA = physicsA->velocity;
+                Vector2f velocityB = physicsB->velocity;
+
+                physicsA->velocity = velocityA - 2 * physicsB->mass / totalMass * (velocityA - velocityB);
+                physicsB->velocity = velocityB - 2 * physicsA->mass / totalMass * (velocityB - velocityA);
+            }
+
+            boxA->handleCollision(entityB);
+            boxB->handleCollision(entityA);
         }
     }
 
 };
+
+class PhysicsSystem : public System {
+public:
+    const Vector2f gravity = Vector2f(0, 9.8f);
+
+    void update(float deltaTime) {
+        for (Entity* entity : entities) {
+            PhysicsComponent* physics = entity->getComponent<PhysicsComponent>();
+            if (physics && !physics->isStatic) {
+                if (physics->isAffectedByGravity) {
+                    // Apply gravity
+                    physics->applyForce(gravity * physics->mass);
+                }
+
+                // Update velocity based on acceleration
+                physics->velocity += physics->acceleration;
+
+                // Apply damping to the velocity
+                physics->velocity *= physics->damping;
+
+                // Update position based on velocity
+                TransformComponent* transform = entity->getComponent<TransformComponent>();
+                if (transform) {
+                    Vector2f pos = transform->getPosition();
+                    pos += physics->velocity * deltaTime;
+                    transform->setPosition(pos);
+                }
+
+                // Reset acceleration for next frame
+                physics->acceleration = Vector2f(0, 0);
+            }
+        }
+    }
+
+    void tryAddEntity(Entity* entity) override {
+        if (entity->getComponent<PhysicsComponent>()) {
+            entities.push_back(entity);
+        }
+    }
+};
+

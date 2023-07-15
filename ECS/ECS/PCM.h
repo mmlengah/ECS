@@ -147,6 +147,10 @@ namespace PC {
 			return Vector2(x * cosAngle - y * sinAngle, x * sinAngle + y * cosAngle);
 		}
 
+		friend Vector2 operator*(const T& scalar, const Vector2& vec) {
+			return Vector2(scalar * vec.x, scalar * vec.y);
+		}
+
 		friend std::ostream& operator<<(std::ostream& os, const Vector2& v) {
 			os << "[" << "x: " << v.x << ", y: " << v.y << "]";
 			return os;

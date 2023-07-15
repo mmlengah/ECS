@@ -11,13 +11,14 @@ std::shared_ptr<Entity> createPlayerPrefab(SDL_Renderer* renderer) {
 
 
     // Add necessary components
-    player->addComponent<TransformComponent>(Vector2f(320, 240), 0.0f, Vector2f(3.f, 3.f));
+    player->addComponent<TransformComponent>(Vector2f(320, 140), 0.0f, Vector2f(3.f, 3.f));
     player->addComponent<SpriteComponent>(renderer,
         "Assets/mystic_woods_2.1/sprites/characters/player.png");
     player->addComponent<VelocityComponent>(100, 100);  
     player->addComponent<InputComponent>();
     player->addComponent<UpdateComponent>();
     player->addComponent<BoxColliderComponent>();
+    player->addComponent<PhysicsComponent>(80.0f, false);
 
     // Get the InputComponent and bind keys to commands
     InputComponent* input = player->getComponent<InputComponent>();
