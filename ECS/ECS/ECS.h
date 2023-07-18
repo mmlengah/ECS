@@ -10,6 +10,7 @@
 #include <SDL_image.h>
 #include "PCM.h"
 #include "Camera.h"
+#include <limits>
 
 /*
 TODO:
@@ -602,7 +603,12 @@ public:
 
     PhysicsComponent(float mass, bool isAffectedByGravity = true, bool isStatic = false)
         : mass(mass), isAffectedByGravity(isAffectedByGravity), isStatic(isStatic),
-        velocity(0, 0), acceleration(0, 0) {}
+        velocity(0, 0), acceleration(0, 0) 
+    {
+        if (isStatic) {
+            mass = std::numeric_limits<float>::infinity();
+        }
+    }
 
     void applyForce(const Vector2f& force) {
         if (!isStatic) {
@@ -822,27 +828,25 @@ private:
             Vector2f tB = transformB->getPosition();
 
             // Resolve collision by pushing the entities out of collision along the axis of least overlap
-            // Only if the entity is not static
-            float totalMass = physicsA->mass + physicsB->mass;
             if (!physicsA->isStatic) {
                 if (xOverlap < yOverlap) {
-                    if (rectA.x < rectB.x) tA.x -= xOverlap * (physicsB->mass / totalMass);
-                    else tA.x += xOverlap * (physicsB->mass / totalMass);
+                    if (rectA.x < rectB.x) tA.x -= xOverlap;
+                    else tA.x += xOverlap;
                 }
                 else {
-                    if (rectA.y < rectB.y) tA.y -= yOverlap * (physicsB->mass / totalMass);
-                    else tA.y += yOverlap * (physicsB->mass / totalMass);
+                    if (rectA.y < rectB.y) tA.y -= yOverlap;
+                    else tA.y += yOverlap;
                 }
             }
 
             if (!physicsB->isStatic) {
                 if (xOverlap < yOverlap) {
-                    if (rectB.x < rectA.x) tB.x -= xOverlap * (physicsA->mass / totalMass);
-                    else tB.x += xOverlap * (physicsA->mass / totalMass);
+                    if (rectB.x < rectA.x) tB.x -= xOverlap;
+                    else tB.x += xOverlap;
                 }
                 else {
-                    if (rectB.y < rectA.y) tB.y -= yOverlap * (physicsA->mass / totalMass);
-                    else tB.y += yOverlap * (physicsA->mass / totalMass);
+                    if (rectB.y < rectA.y) tB.y -= yOverlap;
+                    else tB.y += yOverlap;
                 }
             }
 
@@ -850,19 +854,27 @@ private:
             transformB->setPosition(tB);
 
             // After separating entities, apply conservation of momentum to calculate new velocities
-            if (!physicsA->isStatic || !physicsB->isStatic) {
+            float totalMass = (physicsA->isStatic) ? physicsB->mass : (physicsB->isStatic) ? physicsA->mass : physicsA->mass + physicsB->mass;
+            if (!physicsA->isStatic && !physicsB->isStatic) {
                 Vector2f velocityA = physicsA->velocity;
                 Vector2f velocityB = physicsB->velocity;
 
                 physicsA->velocity = velocityA - 2 * physicsB->mass / totalMass * (velocityA - velocityB);
                 physicsB->velocity = velocityB - 2 * physicsA->mass / totalMass * (velocityB - velocityA);
             }
+            else if (!physicsA->isStatic) {
+                Vector2f velocityA = physicsA->velocity;
+                physicsA->velocity = velocityA - 2 * (velocityA - Vector2f(0, 0));  // As physicsB is static, we do not consider its mass
+            }
+            else if (!physicsB->isStatic) {
+                Vector2f velocityB = physicsB->velocity;
+                physicsB->velocity = velocityB - 2 * (velocityB - Vector2f(0, 0));  // As physicsA is static, we do not consider its mass
+            }
 
             boxA->handleCollision(entityB);
             boxB->handleCollision(entityA);
         }
     }
-
 };
 
 class PhysicsSystem : public System {

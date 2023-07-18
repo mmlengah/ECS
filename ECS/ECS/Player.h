@@ -26,6 +26,9 @@ std::shared_ptr<Entity> createPlayerPrefab(SDL_Renderer* renderer) {
     UpdateComponent* update = player->getComponent<UpdateComponent>();
     TransformComponent* transform = player->getComponent<TransformComponent>();
     SpriteComponent* sprite = player->getComponent<SpriteComponent>();
+    PhysicsComponent* physics = player->getComponent<PhysicsComponent>();
+
+    physics->damping = 0.1f;
 
     // Define animation states
     sprite->addAnimationState("idleFront", AnimationState(6*0, 6, 100));    

@@ -4,6 +4,7 @@
 #include "Player.h"
 #include <iostream>
 
+
 Game::Game() : quit(false), oldTime(0), currentTime(0), deltaTime(0), win(nullptr, SDL_DestroyWindow),
 renderer(nullptr, SDL_DestroyRenderer), renderSystem(nullptr), inputSystem(nullptr),
 updateSystem(nullptr), worldSpaceSystem(nullptr), collisionSystem(nullptr), physicsSystem(nullptr),
@@ -59,21 +60,25 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     box->addComponent<TransformComponent>(Vector2f(0, 0), 0.0f, Vector2f(2.0f, 2.0f));
     box->addComponent<SquareComponent>(a, white);
     box->addComponent<BoxColliderComponent>();
+    box->addComponent<PhysicsComponent>(10.0f, false, true);
 
     auto box2 = Entity::create();
     box2->addComponent<TransformComponent>(Vector2f(620, 0), 0.0f, Vector2f(3.0f, 3.0f));
     box2->addComponent<SquareComponent>(a, white);
     box2->addComponent<BoxColliderComponent>();
+    box2->addComponent<PhysicsComponent>(10.f, false, true);
 
     auto box3 = Entity::create();
     box3->addComponent<TransformComponent>(Vector2f(0, 460), 0.0f, Vector2f(2.0f, 2.0f));
     box3->addComponent<SquareComponent>(a, white);
     box3->addComponent<BoxColliderComponent>();
+    box3->addComponent<PhysicsComponent>(10.f, false, true);
 
     auto box4 = Entity::create();
     box4->addComponent<TransformComponent>(Vector2f(620, 460), 0.0f, Vector2f(20.0f, 20.0f));
     box4->addComponent<SquareComponent>(a, white);    
     box4->addComponent<BoxColliderComponent>();
+    box4->addComponent<PhysicsComponent>(10.f, false, true);
 
     SDL_Color blue = { 0, 0, 255, 255 };
     auto box5 = Entity::create();
@@ -99,9 +104,10 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
         box5physics->isAffectedByGravity = true;
     });
 
+    SDL_Color red = { 255, 0, 0, 255 };
     auto box6= Entity::create();
     box6->addComponent<TransformComponent>(Vector2f(520, 40), 0.0f, Vector2f(2.0f, 2.0f));
-    box6->addComponent<SquareComponent>(a, blue);
+    box6->addComponent<SquareComponent>(a, red);
     box6->addComponent<BoxColliderComponent>();
     box6->addComponent<UpdateComponent>();
     box6->addComponent<PhysicsComponent>(10.f, false);
@@ -109,7 +115,7 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     PhysicsComponent* box6physics = box6->getComponent<PhysicsComponent>();
     BoxColliderComponent* box6BoxCollider = box6->getComponent<BoxColliderComponent>();
 
-    box6update->addUpdateFunction([speed, box6physics](Entity& entity, float deltaTime) {
+    box6update->addUpdateFunction([speed, box6physics](Entity& entity, float deltaTime) {        
         if (*speed > 0) {
             box6physics->applyForce(Vector2f(-(*speed), 0.0f) * deltaTime);
         }
@@ -117,6 +123,7 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     });
 
     box6BoxCollider->addCollisionHandler([speed, box6physics](Entity* self, Entity* other) {
+        *speed = 0;
         box6physics->isAffectedByGravity = true;
     });
 
@@ -157,7 +164,7 @@ void Game::Update()
     cam->lookAt(player->getComponent<TransformComponent>()->getPosition());
     updateSystem->update(deltaTime);
     collisionSystem->update();
-    physicsSystem->update(deltaTime);    
+    physicsSystem->update(deltaTime);  
     worldSpaceSystem->update();
 }
 
