@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <unordered_map>
+#include <map>
 #include <typeindex>
 #include <memory>
 #include <functional>
@@ -629,9 +630,17 @@ public:
     }
 };
 
+class RenderLayerComponent : public Component {
+public:
+    int layer;
+
+    RenderLayerComponent(int layer) : layer(layer) {}
+};
+
 class RenderSystem : public System {
 public:
     SDL_Renderer* renderer;
+    std::map<int, std::vector<Entity*>> renderLayers;
 
     RenderSystem(SDL_Renderer* renderer) : renderer(renderer) {}
 
@@ -639,43 +648,45 @@ public:
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer); //error here
 
-        for (auto it = entities.rbegin(); it != entities.rend(); ++it) {
-            Entity* entity = *it;
-            TransformComponent* transform = entity->getComponent<TransformComponent>();
-            SpriteComponent* sprite = entity->getComponent<SpriteComponent>();            
-            SquareComponent* shape = entity->getComponent<SquareComponent>();
-            if (sprite) {
-                SDL_Rect temp = sprite->getWorldSpaceRect();
 
-                float rot = transform->getWorldSpaceRotation();
+        for (auto& layer : renderLayers) {
+            for (Entity* entity : layer.second) {
+                TransformComponent* transform = entity->getComponent<TransformComponent>();
+                SpriteComponent* sprite = entity->getComponent<SpriteComponent>();
+                SquareComponent* shape = entity->getComponent<SquareComponent>();
+                if (sprite) {
+                    SDL_Rect temp = sprite->getWorldSpaceRect();
 
-                SDL_RenderCopyEx(renderer, sprite->spriteSheet, &(sprite->srcRect), &temp,
-                    transform->getRotation(), nullptr, sprite->flip);
-                sprite->nextFrame(deltaTime);
+                    float rot = transform->getWorldSpaceRotation();
 
-                BoxColliderComponent* boxCollider = entity->getComponent<BoxColliderComponent>();
-                if (boxCollider) {
-                    SDL_Rect rect = boxCollider->getWorldSpaceRect();
+                    SDL_RenderCopyEx(renderer, sprite->spriteSheet, &(sprite->srcRect), &temp,
+                        transform->getRotation(), nullptr, sprite->flip);
+                    sprite->nextFrame(deltaTime);
 
-                    SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);
-                    SDL_RenderDrawRect(renderer, &rect);
+                    BoxColliderComponent* boxCollider = entity->getComponent<BoxColliderComponent>();
+                    if (boxCollider) {
+                        SDL_Rect rect = boxCollider->getWorldSpaceRect();
+
+                        SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);
+                        SDL_RenderDrawRect(renderer, &rect);
+                    }
                 }
-            }
-            else if (shape) {
-                SDL_Rect temp = shape->getWorldSpaceRect();
+                else if (shape) {
+                    SDL_Rect temp = shape->getWorldSpaceRect();
 
-                float rot = transform->getWorldSpaceRotation();
+                    float rot = transform->getWorldSpaceRotation();
 
-                SDL_SetRenderDrawColor(renderer, shape->color.r, shape->color.g,
-                    shape->color.b, shape->color.a);
-                SDL_RenderFillRect(renderer, &temp);
+                    SDL_SetRenderDrawColor(renderer, shape->color.r, shape->color.g,
+                        shape->color.b, shape->color.a);
+                    SDL_RenderFillRect(renderer, &temp);
 
-                BoxColliderComponent* boxCollider = entity->getComponent<BoxColliderComponent>();
-                if (boxCollider) {
-                    SDL_Rect rect = boxCollider->getWorldSpaceRect();
+                    BoxColliderComponent* boxCollider = entity->getComponent<BoxColliderComponent>();
+                    if (boxCollider) {
+                        SDL_Rect rect = boxCollider->getWorldSpaceRect();
 
-                    SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);
-                    SDL_RenderDrawRect(renderer, &rect);
+                        SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);
+                        SDL_RenderDrawRect(renderer, &rect);
+                    }
                 }
             }
             
@@ -685,8 +696,15 @@ public:
     }
 
     void tryAddEntity(Entity* entity) override {
-        if (entity->getComponent<TransformComponent>() && entity->getComponent<SpriteComponent>() || entity->getComponent<SquareComponent>()) {
-            entities.push_back(entity);
+        if (entity->getComponent<TransformComponent>() && (entity->getComponent<SpriteComponent>() || entity->getComponent<SquareComponent>())) {
+            RenderLayerComponent* layerComp = entity->getComponent<RenderLayerComponent>();
+            if (layerComp) {
+                renderLayers[layerComp->layer].push_back(entity);
+            }
+            else {
+                // Default to layer 0 if no layer component is present
+                renderLayers[0].push_back(entity);
+            }
         }
     }
 };
