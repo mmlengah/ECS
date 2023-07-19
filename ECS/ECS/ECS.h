@@ -6,19 +6,22 @@
 #include <memory>
 #include <functional>
 #include <algorithm>
+#include <limits>
+#include <chrono>
 #include <SDL.h>
 #include <SDL_image.h>
 #include "PCM.h"
 #include "Camera.h"
-#include <limits>
+
 
 /*
 TODO:
-Collision
+Collision layer
+Render Layer
+Collision with rotation
 Sound
 Light
 Particles
-Physics
 */
 
 using namespace PC;
@@ -183,11 +186,11 @@ class AnimationState {
 public:
     int beginFrameIndex;
     int frameCount;
-    Uint32 frameDelay;
+    float frameTime; // Changed from frameDelay (Uint32) to frameTime (float)
     SDL_RendererFlip flip;
 
-    AnimationState(int beginFrameIndex = 0, int frameCount = 0, Uint32 frameDelay = 60, SDL_RendererFlip flip = SDL_FLIP_NONE)
-        : beginFrameIndex(beginFrameIndex), frameCount(frameCount), frameDelay(frameDelay), flip(flip) {}
+    AnimationState(int beginFrameIndex = 0, int frameCount = 0, float frameTime = 0.5f, SDL_RendererFlip flip = SDL_FLIP_NONE)
+        : beginFrameIndex(beginFrameIndex), frameCount(frameCount), frameTime(frameTime / 1000), flip(flip) {}
 };
 
 class SpriteHandler {
@@ -326,16 +329,17 @@ public:
     int currentFrame;
     int frameCount;
     Uint32 lastFrameTime;
-    Uint32 frameDelay;
     SDL_RendererFlip flip;
     std::unordered_map<std::string, AnimationState> animationStates;
     std::string currentState;
     bool animationPlaying;
+    float frameTime;
+    float elapsedTime; 
 
-    SpriteComponent(SDL_Renderer* renderer, const char* path, int tolerance = 12, 
+    SpriteComponent(SDL_Renderer* renderer, const char* path, int tolerance = 12,
         int yThreshold = 10)
-        : startingFrame(0), currentFrame(0), lastFrameTime(0), 
-        frameDelay(100), flip(SDL_FLIP_NONE), animationPlaying(false) {
+        : startingFrame(0), currentFrame(0), lastFrameTime(0),
+        frameTime(60), flip(SDL_FLIP_NONE), elapsedTime(0.0f), animationPlaying(false) {
 
         spriteSheet = IMG_LoadTexture(renderer, path);
         if (!spriteSheet) {
@@ -370,28 +374,27 @@ public:
             startingFrame = state.beginFrameIndex;
             currentFrame = state.beginFrameIndex;            
             frameCount = state.frameCount;
-            frameDelay = state.frameDelay;
             flip = state.flip; 
+            frameTime = state.frameTime;
         }
         else {
             std::cerr << "No such animation state exists: " << stateName << std::endl;
         }
     }
 
-    void nextFrame() {
-        // Get the current time.
-        Uint32 currentTime = SDL_GetTicks();
+    void nextFrame(float deltaTime) {
+        // Increment the elapsed time by delta time.
+        elapsedTime += deltaTime;
 
         // If enough time has passed since the last frame...
-        if (currentTime > lastFrameTime + frameDelay) {
-            //std::cout << currentFrame << std::endl;
+        if (elapsedTime >= frameTime) {
+            // Reset the elapsed time
+            elapsedTime -= frameTime;
 
+            // Move to the next frame
             currentFrame = (currentFrame - startingFrame + 1) % frameCount + startingFrame;
 
             srcRect = frames[currentFrame];
-
-            // Set the time of this frame.
-            lastFrameTime = currentTime;
 
             auto it = animationStates.find(currentState);
             if (it != animationStates.end()) {
@@ -399,8 +402,8 @@ public:
                 // Check if we've reached the end of the animation.
                 if (currentFrame - startingFrame + 1 >= state.frameCount) {
                     animationPlaying = false;
-                    //std::cout << currentFrame << std::endl;
-                    currentFrame = state.beginFrameIndex;                    
+                    // Reset to the first frame of the animation.
+                    currentFrame = state.beginFrameIndex;
                 }
             }
         }
@@ -632,7 +635,7 @@ public:
 
     RenderSystem(SDL_Renderer* renderer) : renderer(renderer) {}
 
-    void update() {
+    void update(float deltaTime) {
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer); //error here
 
@@ -648,7 +651,7 @@ public:
 
                 SDL_RenderCopyEx(renderer, sprite->spriteSheet, &(sprite->srcRect), &temp,
                     transform->getRotation(), nullptr, sprite->flip);
-                sprite->nextFrame();
+                sprite->nextFrame(deltaTime);
 
                 BoxColliderComponent* boxCollider = entity->getComponent<BoxColliderComponent>();
                 if (boxCollider) {

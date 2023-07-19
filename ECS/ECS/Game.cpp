@@ -170,5 +170,5 @@ void Game::Update()
 
 void Game::Render()
 {
-    renderSystem->update();
+    renderSystem->update(deltaTime);
 }

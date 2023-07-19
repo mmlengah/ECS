@@ -31,19 +31,19 @@ std::shared_ptr<Entity> createPlayerPrefab(SDL_Renderer* renderer) {
     physics->damping = 0.1f;
 
     // Define animation states
-    sprite->addAnimationState("idleFront", AnimationState(6*0, 6, 100));    
-    sprite->addAnimationState("idleRight", AnimationState(6*1, 6, 100));   
-    sprite->addAnimationState("idleLeft", AnimationState(6*1, 6, 100, SDL_FLIP_HORIZONTAL));
-    sprite->addAnimationState("idleBack", AnimationState(6*2, 6, 100));    
-    sprite->addAnimationState("walkingFront", AnimationState(6*3, 6, 100));    
-    sprite->addAnimationState("walkingRight", AnimationState(6*4, 6, 100));    
-    sprite->addAnimationState("walkingLeft", AnimationState(6*4, 6, 100, SDL_FLIP_HORIZONTAL));    
-    sprite->addAnimationState("walkingBack", AnimationState(6*5, 6, 100));    
-    sprite->addAnimationState("attackingFront", AnimationState(6*6, 4, 100));
-    sprite->addAnimationState("attackingRight", AnimationState(6*6 + 4, 4, 100));    
-    sprite->addAnimationState("attackingLeft", AnimationState(6*6 + 4, 4, 100, SDL_FLIP_HORIZONTAL));
-    sprite->addAnimationState("attackingBack", AnimationState(6 * 6 + 4 * 2, 4, 100));
-    sprite->addAnimationState("death", AnimationState(6 * 6 + 4 * 3, 4, 100));
+    sprite->addAnimationState("idleFront", AnimationState(6*0, 6, 125));    
+    sprite->addAnimationState("idleRight", AnimationState(6*1, 6, 125));   
+    sprite->addAnimationState("idleLeft", AnimationState(6*1, 6, 125, SDL_FLIP_HORIZONTAL));
+    sprite->addAnimationState("idleBack", AnimationState(6*2, 6, 125));    
+    sprite->addAnimationState("walkingFront", AnimationState(6*3, 6, 125));    
+    sprite->addAnimationState("walkingRight", AnimationState(6*4, 6, 125));    
+    sprite->addAnimationState("walkingLeft", AnimationState(6*4, 6, 125, SDL_FLIP_HORIZONTAL));    
+    sprite->addAnimationState("walkingBack", AnimationState(6*5, 6, 125));    
+    sprite->addAnimationState("attackingFront", AnimationState(6*6, 4, 125));
+    sprite->addAnimationState("attackingRight", AnimationState(6*6 + 4, 4, 125));    
+    sprite->addAnimationState("attackingLeft", AnimationState(6*6 + 4, 4, 125, SDL_FLIP_HORIZONTAL));
+    sprite->addAnimationState("attackingBack", AnimationState(6 * 6 + 4 * 2, 4, 125));
+    sprite->addAnimationState("death", AnimationState(6 * 6 + 4 * 3, 4, 125));
 
     // Set the animation
     sprite->setAnimationState("idleFront");
