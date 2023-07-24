@@ -3,12 +3,12 @@
 #include "ECS.h"
 #include "Player.h"
 #include <iostream>
+#include "Renderer.h"
 
 
 Game::Game() : quit(false), oldTime(0), currentTime(0), deltaTime(0), win(nullptr, SDL_DestroyWindow),
-renderer(nullptr, SDL_DestroyRenderer), renderSystem(nullptr), inputSystem(nullptr),
-updateSystem(nullptr), worldSpaceSystem(nullptr), collisionSystem(nullptr), physicsSystem(nullptr),
-cam(nullptr), player(nullptr)
+renderSystem(nullptr), inputSystem(nullptr), updateSystem(nullptr), worldSpaceSystem(nullptr),
+collisionSystem(nullptr), physicsSystem(nullptr), cam(nullptr), player(nullptr)
 {
 
 }
@@ -37,21 +37,21 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     const int viewPortHeight = 480;
 
     win.reset(SDL_CreateWindow("Hello World!", 100, 100, viewPortWidth, viewPortHeight, SDL_WINDOW_SHOWN));
-    renderer.reset(SDL_CreateRenderer(win.get(), -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC));
+    Renderer::Instance().Initialize(win.get());
 
     //add camera
     cam = new Camera(Vector2f(0, 0), Vector2f(1, 1), 0, Vector2int(viewPortWidth, viewPortHeight));
 
     systemManager = std::make_unique<SystemManager>();
 
-    renderSystem = &(systemManager->registerSystem<RenderSystem>(renderer.get()));
+    renderSystem = &(systemManager->registerSystem<RenderSystem>());
     inputSystem = &(systemManager->registerSystem<InputSystem>());
     updateSystem = &(systemManager->registerSystem<UpdateSystem>());
     worldSpaceSystem = &(systemManager->registerSystem<WorldSpaceSystem>(cam));
     collisionSystem = &(systemManager->registerSystem<CollisionSystem>());
     physicsSystem = &(systemManager->registerSystem<PhysicsSystem>());
     
-    player = createPlayerPrefab(renderer.get());
+    player = createPlayerPrefab();
 
     Rectangle a = { 10, 10 };
     SDL_Color white = { 255, 255, 255, 255 };
@@ -76,7 +76,7 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
 
     auto box4 = Entity::create();
     box4->addComponent<TransformComponent>(Vector2f(620, 460), 0.0f, Vector2f(20.0f, 20.0f));
-    box4->addComponent<SquareComponent>(a, white);    
+    box4->addComponent<SquareComponent>(a, white);
     box4->addComponent<BoxColliderComponent>();
     box4->addComponent<PhysicsComponent>(10.f, false, true);
 
@@ -96,17 +96,17 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     box5update->addUpdateFunction([speed, box5physics](Entity& entity, float deltaTime) {
         if (*speed > 0) {
             box5physics->applyForce(Vector2f(*speed, 0.0f) * deltaTime);
-        }        
-    });
+        }
+        });
 
     box5BoxCollider->addCollisionHandler([speed, box5physics](Entity* self, Entity* other) {
         *speed = 0;
         box5physics->isAffectedByGravity = true;
-    });
+        });
 
     SDL_Color red = { 255, 0, 0, 255 };
-    auto box6= Entity::create();
-    box6->addComponent<TransformComponent>(Vector2f(520, 40), 0.0f, Vector2f(2.0f, 2.0f));
+    auto box6 = Entity::create();
+    box6->addComponent<TransformComponent>(Vector2f(520, 40), 45.0f, Vector2f(2.0f, 2.0f));
     box6->addComponent<SquareComponent>(a, red);
     box6->addComponent<BoxColliderComponent>();
     box6->addComponent<UpdateComponent>();

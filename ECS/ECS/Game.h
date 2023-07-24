@@ -22,7 +22,6 @@ private:
     Uint32 oldTime, currentTime;
     float deltaTime;
     std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> win;
-    std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)> renderer;
     std::unique_ptr<SystemManager> systemManager;
     RenderSystem* renderSystem;
     InputSystem* inputSystem;        

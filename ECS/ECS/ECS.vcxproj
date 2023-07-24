@@ -150,6 +150,7 @@ xcopy /D /Y "$(SolutionDir)Dependancies\SDL2_image\lib\x64\*.dll" "$(TargetDir)"
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Renderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
@@ -159,6 +160,7 @@ xcopy /D /Y "$(SolutionDir)Dependancies\SDL2_image\lib\x64\*.dll" "$(TargetDir)"
     <ClInclude Include="PCR.h" />
     <ClInclude Include="PCTP.h" />
     <ClInclude Include="Player.h" />
+    <ClInclude Include="Renderer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

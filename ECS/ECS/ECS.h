@@ -13,6 +13,7 @@
 #include <SDL_image.h>
 #include "PCM.h"
 #include "Camera.h"
+#include "Renderer.h"
 
 
 /*
@@ -337,12 +338,12 @@ public:
     float frameTime;
     float elapsedTime; 
 
-    SpriteComponent(SDL_Renderer* renderer, const char* path, int tolerance = 12,
+    SpriteComponent(const char* path, int tolerance = 12,
         int yThreshold = 10)
         : startingFrame(0), currentFrame(0), lastFrameTime(0),
         frameTime(60), flip(SDL_FLIP_NONE), elapsedTime(0.0f), animationPlaying(false) {
 
-        spriteSheet = IMG_LoadTexture(renderer, path);
+        spriteSheet = IMG_LoadTexture(Renderer::Instance().Get(), path);
         if (!spriteSheet) {
             std::cerr << "Failed to load texture: " << IMG_GetError() << "\n";
         }
@@ -527,8 +528,32 @@ class SquareComponent : public Component {
 public:
     Rectangle rect;
     SDL_Color color;
+    SDL_Texture* texture;
 
-    SquareComponent(Rectangle rect, SDL_Color color) : rect(rect), color(color) {}
+    SquareComponent(Rectangle rect, SDL_Color color)
+        : rect(rect), color(color) {
+
+        SDL_Renderer* renderer = Renderer::Instance().Get();
+
+        // Create the main rectangle texture.
+        texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
+            SDL_TEXTUREACCESS_TARGET, rect.width, rect.height);
+
+        // Set the texture as the render target.
+        SDL_SetRenderTarget(renderer, texture);
+
+        // Draw the main rectangle.
+        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+        SDL_Rect mainRect = { 0, 0, rect.width, rect.height };
+        SDL_RenderFillRect(renderer, &mainRect);
+
+        // Reset the render target.
+        SDL_SetRenderTarget(renderer, NULL);
+    }
+
+    ~SquareComponent() {
+        SDL_DestroyTexture(texture);
+    }
 
     SDL_Rect getWorldSpaceRect() {
         TransformComponent* transform = owner->getComponent<TransformComponent>();
@@ -549,9 +574,52 @@ public:
 
 class BoxColliderComponent : public Component {
 public:
-    BoxColliderComponent() : customCollider(false) {}
+    SDL_Texture* outlineTexture; 
 
-    BoxColliderComponent(Rectangle rect) : rect(rect), customCollider(false) {}
+    BoxColliderComponent() : customCollider(false) {
+        SDL_Renderer* renderer = Renderer::Instance().Get();
+        SDL_Rect a = {0,0,0,0};
+
+        // Create the outline texture.
+        outlineTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
+            SDL_TEXTUREACCESS_TARGET, a.w, a.h);
+
+        // Set the outline texture as the render target.
+        SDL_SetRenderTarget(renderer, outlineTexture);
+
+        // Draw the outline.
+        SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);
+        SDL_Rect outlineRect = { 0, 0, a.w, a.h };
+        SDL_RenderFillRect(renderer, &outlineRect);
+
+        // Reset the render target.
+        SDL_SetRenderTarget(renderer, NULL);
+    }
+
+    BoxColliderComponent(Rectangle rect)
+        : rect(rect), customCollider(true) {
+
+        SDL_Renderer* renderer = Renderer::Instance().Get();
+
+        // Create the outline texture.
+        outlineTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
+            SDL_TEXTUREACCESS_TARGET, rect.width, rect.height);
+
+        // Set the outline texture as the render target.
+        SDL_SetRenderTarget(renderer, outlineTexture);
+
+        // Draw the outline.
+        SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);
+        SDL_Rect outlineRect = { 0, 0, rect.width, rect.height };
+        SDL_RenderFillRect(renderer, &outlineRect);
+
+        // Reset the render target.
+        SDL_SetRenderTarget(renderer, NULL);
+    }
+
+    ~BoxColliderComponent() {
+        SDL_DestroyTexture(outlineTexture); // Destroy the outline texture
+    }
 
     SDL_Rect getWorldSpaceRect() {
         SpriteComponent* sprite = owner->getComponent<SpriteComponent>();
@@ -642,11 +710,11 @@ public:
     SDL_Renderer* renderer;
     std::map<int, std::vector<Entity*>> renderLayers;
 
-    RenderSystem(SDL_Renderer* renderer) : renderer(renderer) {}
+    RenderSystem() : renderer(Renderer::Instance().Get()) {}
 
     void update(float deltaTime) {
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-        SDL_RenderClear(renderer); //error here
+        SDL_RenderClear(renderer);
 
 
         for (auto& layer : renderLayers) {
@@ -673,20 +741,14 @@ public:
                 }
                 else if (shape) {
                     SDL_Rect temp = shape->getWorldSpaceRect();
-
                     float rot = transform->getWorldSpaceRotation();
-
-                    SDL_SetRenderDrawColor(renderer, shape->color.r, shape->color.g,
-                        shape->color.b, shape->color.a);
-                    SDL_RenderFillRect(renderer, &temp);
-
                     BoxColliderComponent* boxCollider = entity->getComponent<BoxColliderComponent>();
                     if (boxCollider) {
-                        SDL_Rect rect = boxCollider->getWorldSpaceRect();
+                        SDL_RenderCopyEx(renderer, boxCollider->outlineTexture, NULL, &temp, rot, NULL, SDL_FLIP_NONE);
 
-                        SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);
-                        SDL_RenderDrawRect(renderer, &rect);
+                        temp = { temp.x + 1, temp.y + 1, temp.w - 2, temp.h - 2 };
                     }
+                    SDL_RenderCopyEx(renderer, shape->texture, NULL, &temp, rot, NULL, SDL_FLIP_NONE);                    
                 }
             }
             
