@@ -162,10 +162,10 @@ void Game::Run()
 void Game::Update()
 {
     cam->lookAt(player->getComponent<TransformComponent>()->getPosition());
+    worldSpaceSystem->update();
     updateSystem->update(deltaTime);
     collisionSystem->update();
-    physicsSystem->update(deltaTime);  
-    worldSpaceSystem->update();
+    physicsSystem->update(deltaTime);      
 }
 
 void Game::Render()

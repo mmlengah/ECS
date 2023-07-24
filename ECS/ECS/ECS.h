@@ -8,7 +8,7 @@
 #include <functional>
 #include <algorithm>
 #include <limits>
-#include <chrono>
+#include <cmath>  
 #include <SDL.h>
 #include <SDL_image.h>
 #include "PCM.h"
@@ -574,52 +574,11 @@ public:
 
 class BoxColliderComponent : public Component {
 public:
-    SDL_Texture* outlineTexture; 
-
-    BoxColliderComponent() : customCollider(false) {
-        SDL_Renderer* renderer = Renderer::Instance().Get();
-        SDL_Rect a = {0,0,0,0};
-
-        // Create the outline texture.
-        outlineTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
-            SDL_TEXTUREACCESS_TARGET, a.w, a.h);
-
-        // Set the outline texture as the render target.
-        SDL_SetRenderTarget(renderer, outlineTexture);
-
-        // Draw the outline.
-        SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);
-        SDL_Rect outlineRect = { 0, 0, a.w, a.h };
-        SDL_RenderFillRect(renderer, &outlineRect);
-
-        // Reset the render target.
-        SDL_SetRenderTarget(renderer, NULL);
-    }
+    BoxColliderComponent() : customCollider(false) { }
 
     BoxColliderComponent(Rectangle rect)
-        : rect(rect), customCollider(true) {
+        : rect(rect), customCollider(true) { }
 
-        SDL_Renderer* renderer = Renderer::Instance().Get();
-
-        // Create the outline texture.
-        outlineTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
-            SDL_TEXTUREACCESS_TARGET, rect.width, rect.height);
-
-        // Set the outline texture as the render target.
-        SDL_SetRenderTarget(renderer, outlineTexture);
-
-        // Draw the outline.
-        SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);
-        SDL_Rect outlineRect = { 0, 0, rect.width, rect.height };
-        SDL_RenderFillRect(renderer, &outlineRect);
-
-        // Reset the render target.
-        SDL_SetRenderTarget(renderer, NULL);
-    }
-
-    ~BoxColliderComponent() {
-        SDL_DestroyTexture(outlineTexture); // Destroy the outline texture
-    }
 
     SDL_Rect getWorldSpaceRect() {
         SpriteComponent* sprite = owner->getComponent<SpriteComponent>();
@@ -733,22 +692,32 @@ public:
 
                     BoxColliderComponent* boxCollider = entity->getComponent<BoxColliderComponent>();
                     if (boxCollider) {
-                        SDL_Rect rect = boxCollider->getWorldSpaceRect();
+                        SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);  // Light blue
 
-                        SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);
-                        SDL_RenderDrawRect(renderer, &rect);
+                        SDL_Point points[5];
+                        computeRotatedBox(boxCollider, rot, points);
+                        SDL_RenderDrawLines(renderer, points, 5);
+
                     }
                 }
                 else if (shape) {
                     SDL_Rect temp = shape->getWorldSpaceRect();
                     float rot = transform->getWorldSpaceRotation();
-                    BoxColliderComponent* boxCollider = entity->getComponent<BoxColliderComponent>();
-                    if (boxCollider) {
-                        SDL_RenderCopyEx(renderer, boxCollider->outlineTexture, NULL, &temp, rot, NULL, SDL_FLIP_NONE);
 
-                        temp = { temp.x + 1, temp.y + 1, temp.w - 2, temp.h - 2 };
+                    SDL_RenderCopyEx(renderer, shape->texture, NULL, &temp, rot, NULL,
+                        SDL_FLIP_NONE);
+
+                    BoxColliderComponent* boxCollider = 
+                        entity->getComponent<BoxColliderComponent>();
+
+                    if (boxCollider) {
+                        SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);  // Light blue
+
+                        SDL_Point points[5];
+                        computeRotatedBox(boxCollider, rot, points);
+                        SDL_RenderDrawLines(renderer, points, 5);
                     }
-                    SDL_RenderCopyEx(renderer, shape->texture, NULL, &temp, rot, NULL, SDL_FLIP_NONE);                    
+                    
                 }
             }
             
@@ -768,6 +737,36 @@ public:
                 renderLayers[0].push_back(entity);
             }
         }
+    }
+
+
+private:
+    void computeRotatedBox(BoxColliderComponent* box, float rotation, SDL_Point points[5]) {
+        SDL_Rect rect = box->getWorldSpaceRect();
+        int x = rect.x;
+        int y = rect.y;
+        int w = rect.w;
+        int h = rect.h;
+
+        double rad = rotation * M_PI / 180;
+
+        // Find the center of the box
+        SDL_Point center = { x + w / 2, y + h / 2 };
+
+        // Compute each corner of the box relative to the center, then rotate
+        points[0].x = static_cast<int>(std::round(center.x + (x - center.x) * cos(rad) - (y - center.y) * sin(rad)));
+        points[0].y = static_cast<int>(std::round(center.y + (x - center.x) * sin(rad) + (y - center.y) * cos(rad)));
+
+        points[1].x = static_cast<int>(std::round(center.x + ((x + w) - center.x) * cos(rad) - (y - center.y) * sin(rad)));
+        points[1].y = static_cast<int>(std::round(center.y + ((x + w) - center.x) * sin(rad) + (y - center.y) * cos(rad)));
+
+        points[2].x = static_cast<int>(std::round(center.x + ((x + w) - center.x) * cos(rad) - ((y + h) - center.y) * sin(rad)));
+        points[2].y = static_cast<int>(std::round(center.y + ((x + w) - center.x) * sin(rad) + ((y + h) - center.y) * cos(rad)));
+
+        points[3].x = static_cast<int>(std::round(center.x + (x - center.x) * cos(rad) - ((y + h) - center.y) * sin(rad)));
+        points[3].y = static_cast<int>(std::round(center.y + (x - center.x) * sin(rad) + ((y + h) - center.y) * cos(rad)));
+
+        points[4] = points[0];  // Close the loop
     }
 };
 
