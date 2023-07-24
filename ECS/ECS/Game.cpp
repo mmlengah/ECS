@@ -44,7 +44,7 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
 
     systemManager = std::make_unique<SystemManager>();
 
-    renderSystem = &(systemManager->registerSystem<RenderSystem>());
+    renderSystem = &(systemManager->registerSystem<RenderSystem>(true));
     inputSystem = &(systemManager->registerSystem<InputSystem>());
     updateSystem = &(systemManager->registerSystem<UpdateSystem>());
     worldSpaceSystem = &(systemManager->registerSystem<WorldSpaceSystem>(cam));

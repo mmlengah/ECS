@@ -1,7 +1,9 @@
 ﻿  0 File(s) copied
   0 File(s) copied
   0 File(s) copied
+  Camera.cpp
   Game.cpp
   main.cpp
+  Renderer.cpp
   Generating Code...
   ECS.vcxproj -> D:\GitHub\ECS\ECS\x64\Debug\ECS.exe

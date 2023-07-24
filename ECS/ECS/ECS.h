@@ -669,7 +669,13 @@ public:
     SDL_Renderer* renderer;
     std::map<int, std::vector<Entity*>> renderLayers;
 
-    RenderSystem() : renderer(Renderer::Instance().Get()) {}
+    RenderSystem(bool showColliders = false) : renderer(Renderer::Instance().Get()),
+        showColliders(showColliders) 
+    {
+    #ifdef NDEBUG
+        showColliders = false;
+    #endif
+    }
 
     void update(float deltaTime) {
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -689,16 +695,16 @@ public:
                     SDL_RenderCopyEx(renderer, sprite->spriteSheet, &(sprite->srcRect), &temp,
                         transform->getRotation(), nullptr, sprite->flip);
                     sprite->nextFrame(deltaTime);
-
+                #ifdef _DEBUG
                     BoxColliderComponent* boxCollider = entity->getComponent<BoxColliderComponent>();
-                    if (boxCollider) {
+                    if (boxCollider && showColliders) {
                         SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);  // Light blue
 
                         SDL_Point points[5];
                         computeRotatedBox(boxCollider, rot, points);
-                        SDL_RenderDrawLines(renderer, points, 5);
-
+                        SDL_RenderDrawLines(renderer, points, 5);                
                     }
+                #endif
                 }
                 else if (shape) {
                     SDL_Rect temp = shape->getWorldSpaceRect();
@@ -706,18 +712,18 @@ public:
 
                     SDL_RenderCopyEx(renderer, shape->texture, NULL, &temp, rot, NULL,
                         SDL_FLIP_NONE);
-
+                #ifdef _DEBUG
                     BoxColliderComponent* boxCollider = 
                         entity->getComponent<BoxColliderComponent>();
 
-                    if (boxCollider) {
+                    if (boxCollider && showColliders) {
                         SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);  // Light blue
 
                         SDL_Point points[5];
                         computeRotatedBox(boxCollider, rot, points);
                         SDL_RenderDrawLines(renderer, points, 5);
                     }
-                    
+                #endif                
                 }
             }
             
@@ -741,6 +747,9 @@ public:
 
 
 private:
+    bool showColliders;
+private:
+#ifdef _DEBUG
     void computeRotatedBox(BoxColliderComponent* box, float rotation, SDL_Point points[5]) {
         SDL_Rect rect = box->getWorldSpaceRect();
         int x = rect.x;
@@ -768,6 +777,7 @@ private:
 
         points[4] = points[0];  // Close the loop
     }
+#endif
 };
 
 class InputSystem : public System {
