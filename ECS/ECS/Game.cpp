@@ -16,6 +16,11 @@ public:
         physics->applyForce(Vector2f(speed, 0.0f) * deltaTime);
     }
 
+    void handleCollision(Entity* other) override {
+        speed = 0;
+        physics->isAffectedByGravity = true;
+    }
+
     void setSpeed(float speed) {
         this->speed = speed;
     }
@@ -113,13 +118,6 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
 
     box5ScriptComponent->addScript(std::make_shared<BoxMovementScript>());
 
-    auto speed = std::make_shared<float>(1000.0f);
-
-    box5BoxCollider->addCollisionHandler([speed, box5physics](Entity* self, Entity* other) {
-        *speed = 0;
-        box5physics->isAffectedByGravity = true;
-    });
-
     SDL_Color red = { 255, 0, 0, 255 };
     auto box6 = Entity::create();
     box6->addComponent<TransformComponent>(Vector2f(520, 40), 45.0f, Vector2f(2.0f, 2.0f));
@@ -136,11 +134,6 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     boxMovementScript->setSpeed(-1000.0f);
     
     box6ScriptComponent->addScript(boxMovementScript);
-
-    box6BoxCollider->addCollisionHandler([speed, box6physics](Entity* self, Entity* other) {
-        *speed = 0;
-        box6physics->isAffectedByGravity = true;
-    });
 
     systemManager->addAllEntitiesToSystems(Entity::getAllEntities());
 

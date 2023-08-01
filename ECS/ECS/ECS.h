@@ -537,17 +537,6 @@ public:
 
         return { 0, 0, 0, 0 };
     }
-
-    void addCollisionHandler(std::function<void(Entity*, Entity*)> handler) {
-        collisionHandlers.push_back(handler);
-    }
-
-    void handleCollision(Entity* other) {
-        for (const auto& handler : collisionHandlers) {
-            handler(owner, other);
-        }
-    }
-
 private:
     Rectangle rect;
     bool customCollider;
@@ -591,8 +580,17 @@ class Script {
 public:
     Entity* entity = nullptr;
 
-    virtual void start() = 0;
-    virtual void update(float deltaTime) = 0;
+    virtual void start() {
+    
+    }
+
+    virtual void update(float deltaTime) {
+    
+    }
+
+    virtual void handleCollision(Entity* other) {
+    
+    }
 
     void setEntity(Entity* entity) {
         this->entity = entity;
@@ -615,6 +613,12 @@ public:
     void update(float deltaTime) {
         for (auto script : scripts) {
             script->update(deltaTime);
+        }
+    }
+
+    void handleCollision(Entity* other) {
+        for (auto script : scripts) {
+            script->handleCollision(other);
         }
     }
 private:
@@ -831,6 +835,8 @@ private:
     void checkAndResolveCollision(Entity* entityA, Entity* entityB) {
         BoxColliderComponent* boxA = entityA->getComponent<BoxColliderComponent>();
         BoxColliderComponent* boxB = entityB->getComponent<BoxColliderComponent>();
+        ScriptComponent* scriptA = entityA->getComponent<ScriptComponent>();
+        ScriptComponent* scriptB = entityB->getComponent<ScriptComponent>();
         PhysicsComponent* physicsA = entityA->getComponent<PhysicsComponent>();
         PhysicsComponent* physicsB = entityB->getComponent<PhysicsComponent>();
 
@@ -895,8 +901,13 @@ private:
                 physicsB->velocity = velocityB - 2 * (velocityB - Vector2f(0, 0));  // As physicsA is static, we do not consider its mass
             }
 
-            boxA->handleCollision(entityB);
-            boxB->handleCollision(entityA);
+            if (scriptA) {
+                scriptA->handleCollision(entityB);
+            }
+            if (scriptB) {
+                scriptB->handleCollision(entityA);
+            }
+            
         }
     }
 };
