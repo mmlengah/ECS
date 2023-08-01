@@ -18,9 +18,10 @@
 
 /*
 TODO:
+Collision scripts
 Collision layer
-Render Layer
 Collision with rotation
+floor doesn't work objects bounce forever
 Sound
 Light
 Particles
@@ -441,75 +442,6 @@ public:
     VelocityComponent(int dx, int dy) : dx(0), dy(0), dxMax(dx), dyMax(dy) {}
 };
 
-class InputComponent : public Component {
-public:
-    using FunctionId = int;
-
-    std::unordered_map<SDL_Keycode, std::unordered_map<FunctionId, std::function<void(Entity&)>>> keyDownMapping;
-    std::unordered_map<SDL_Keycode, std::unordered_map<FunctionId, std::function<void(Entity&)>>> keyUpMapping;
-    std::unordered_map<uint8_t, std::unordered_map<FunctionId, std::function<void(Entity&)>>> mouseButtonDownMapping;
-    std::unordered_map<uint8_t, std::unordered_map<FunctionId, std::function<void(Entity&)>>> mouseButtonUpMapping;
-    FunctionId nextId = 0;
-
-    FunctionId bindMouseButtonDown(uint8_t button, std::function<void(Entity&)> command) {
-        FunctionId id = nextId++;
-        mouseButtonDownMapping[button][id] = command;
-        return id;
-    }
-
-    FunctionId bindMouseButtonUp(uint8_t button, std::function<void(Entity&)> command) {
-        FunctionId id = nextId++;
-        mouseButtonUpMapping[button][id] = command;
-        return id;
-    }
-
-    FunctionId bindKeyDown(SDL_Keycode key, std::function<void(Entity&)> command) {
-        FunctionId id = nextId++;
-        keyDownMapping[key][id] = command;
-        return id;
-    }
-
-    FunctionId bindKeyUp(SDL_Keycode key, std::function<void(Entity&)> command) {
-        FunctionId id = nextId++;
-        keyUpMapping[key][id] = command;
-        return id;
-    }
-
-    void unbindKey(SDL_Keycode key) {
-        keyDownMapping.erase(key);
-        keyUpMapping.erase(key);
-    }
-
-    void unbindFunction(SDL_Keycode key, FunctionId id) {
-        auto itDown = keyDownMapping.find(key);
-        if (itDown != keyDownMapping.end()) {
-            itDown->second.erase(id);
-        }
-
-        auto itUp = keyUpMapping.find(key);
-        if (itUp != keyUpMapping.end()) {
-            itUp->second.erase(id);
-        }
-    }
-
-    void unbindMouseButton(uint8_t button) {
-        mouseButtonDownMapping.erase(button);
-        mouseButtonUpMapping.erase(button);
-    }
-
-    void unbindMouseFunction(uint8_t button, FunctionId id) {
-        auto itDown = mouseButtonDownMapping.find(button);
-        if (itDown != mouseButtonDownMapping.end()) {
-            itDown->second.erase(id);
-        }
-
-        auto itUp = mouseButtonUpMapping.find(button);
-        if (itUp != mouseButtonUpMapping.end()) {
-            itUp->second.erase(id);
-        }
-    }
-};
-
 struct Rectangle {
     int width;
     int height;
@@ -648,20 +580,45 @@ public:
     }
 };
 
-class UpdateComponent : public Component {
-public:
-    std::vector<std::function<void(Entity&, float)>> onUpdate;
-
-    void addUpdateFunction(std::function<void(Entity&, float)> updateFn) {
-        onUpdate.push_back(updateFn);
-    }
-};
-
 class RenderLayerComponent : public Component {
 public:
     int layer;
 
     RenderLayerComponent(int layer) : layer(layer) {}
+};
+
+class Script {
+public:
+    Entity* entity = nullptr;
+
+    virtual void start() = 0;
+    virtual void update(float deltaTime) = 0;
+
+    void setEntity(Entity* entity) {
+        this->entity = entity;
+    }
+};
+
+class ScriptComponent : public Component {
+public:
+    void addScript(std::shared_ptr<Script> script) {
+        script->setEntity(owner);
+        scripts.push_back(script);
+    }
+
+    void start() {
+        for (auto script : scripts) {
+            script->start();
+        }
+    }
+
+    void update(float deltaTime) {
+        for (auto script : scripts) {
+            script->update(deltaTime);
+        }
+    }
+private:
+    std::vector<std::shared_ptr<Script>> scripts;
 };
 
 class RenderSystem : public System {
@@ -780,78 +737,53 @@ private:
 #endif
 };
 
-class InputSystem : public System {
+class InputSystem {
 public:
+    static InputSystem& getInstance() {
+        static InputSystem instance;
+        return instance;
+    }
+
+    static bool isKeyDown(SDL_Keycode key) {
+        return getInstance().keyStates.find(key) != getInstance().keyStates.end() &&
+            getInstance().keyStates.at(key);
+    }
+
+    static bool isKeyUp(SDL_Keycode key) {
+        return getInstance().keyStates.find(key) == getInstance().keyStates.end() ||
+            !getInstance().keyStates.at(key);
+    }
+
+    static bool isMouseButtonDown(uint8_t button) {
+        return getInstance().mouseButtonStates.find(button) != getInstance().mouseButtonStates.end() &&
+            getInstance().mouseButtonStates.at(button);
+    }
+
+    static bool isMouseButtonUp(uint8_t button) {
+        return getInstance().mouseButtonStates.find(button) == getInstance().mouseButtonStates.end() ||
+            !getInstance().mouseButtonStates.at(button);
+    }
+
     void update(SDL_Event& event) {
-        for (Entity* entity : entities) {
-            InputComponent* input = entity->getComponent<InputComponent>();
-            if (input) {
-                // Check for keydown and keyup events
-                if (event.type == SDL_KEYDOWN) {
-                    SDL_Keycode key = event.key.keysym.sym;
-                    auto it = input->keyDownMapping.find(key);
-                    if (it != input->keyDownMapping.end()) {
-                        for (auto& fn : it->second) {
-                            if (fn.second) fn.second(*entity);
-                        }
-                    }
-                }
-                else if (event.type == SDL_KEYUP) {
-                    SDL_Keycode key = event.key.keysym.sym;
-                    auto it = input->keyUpMapping.find(key);
-                    if (it != input->keyUpMapping.end()) {
-                        for (auto& fn : it->second) {
-                            if (fn.second) fn.second(*entity);
-                        }
-                    }
-                }
-                if (event.type == SDL_MOUSEBUTTONDOWN) {
-                    uint8_t button = event.button.button;
-                    auto it = input->mouseButtonDownMapping.find(button);
-                    if (it != input->mouseButtonDownMapping.end()) {
-                        for (auto& fn : it->second) {
-                            if (fn.second) fn.second(*entity);
-                        }
-                    }
-                }
-                else if (event.type == SDL_MOUSEBUTTONUP) {
-                    uint8_t button = event.button.button;
-                    auto it = input->mouseButtonUpMapping.find(button);
-                    if (it != input->mouseButtonUpMapping.end()) {
-                        for (auto& fn : it->second) {
-                            if (fn.second) fn.second(*entity);
-                        }
-                    }
-                }
-            }
+        // Update the key states based on the event
+        if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
+            SDL_Keycode key = event.key.keysym.sym;
+            keyStates[key] = (event.type == SDL_KEYDOWN);
+        }
+
+        if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) {
+            uint8_t button = event.button.button;
+            mouseButtonStates[button] = (event.type == SDL_MOUSEBUTTONDOWN);
         }
     }
 
-    void tryAddEntity(Entity* entity) override {
-        if (entity->getComponent<InputComponent>()) {
-            entities.push_back(entity);
-        }
-    }
-};
+private:
+    InputSystem() = default; // Private constructor
+    InputSystem(const InputSystem&) = delete; // Prevent copy
+    void operator=(const InputSystem&) = delete; // Prevent assignment
 
-class UpdateSystem : public System {
-public:
-    void update(float deltaTime = 1) {
-        for (Entity* entity : entities) {
-            UpdateComponent* update = entity->getComponent<UpdateComponent>();
-            if (update) {
-                for (auto& updateFunction : update->onUpdate) {
-                    updateFunction(*entity, deltaTime);
-                }
-            }
-        }
-    }
-
-    void tryAddEntity(Entity* entity) override {
-        if (entity->getComponent<UpdateComponent>()) {
-            entities.push_back(entity);
-        }
-    }
+    std::unordered_map<SDL_Keycode, bool> keyStates;
+    std::unordered_map<uint8_t, bool> mouseButtonStates;
 };
 
 class WorldSpaceSystem : public System {
@@ -1004,6 +936,33 @@ public:
 
     void tryAddEntity(Entity* entity) override {
         if (entity->getComponent<PhysicsComponent>()) {
+            entities.push_back(entity);
+        }
+    }
+};
+
+class ScriptSystem : public System {
+public:
+    void start() {
+        for (Entity* entity : entities) {
+            ScriptComponent* script = entity->getComponent<ScriptComponent>();
+            if (script) {
+                script->start();
+            }
+        }
+    }
+
+    void update(float deltaTime) {
+        for (Entity* entity : entities) {
+            ScriptComponent* script = entity->getComponent<ScriptComponent>();
+            if (script) {
+                script->update(deltaTime);
+            }
+        }
+    }
+
+    void tryAddEntity(Entity* entity) override {
+        if (entity->getComponent<ScriptComponent>()) {
             entities.push_back(entity);
         }
     }
