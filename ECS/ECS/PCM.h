@@ -23,6 +23,16 @@ namespace PC {
 			: x(x), y(y)
 		{}
 
+		Vector2 operator*(const Vector2& v) const {
+			return Vector2(x * v.x, y * v.y);
+		}
+
+		Vector2& operator*=(const Vector2& v) {
+			x *= v.x;
+			y *= v.y;
+			return *this;
+		}
+
 		Vector2 operator+(const Vector2& v) const {
 			return Vector2(x + v.x, y + v.y);
 		}
@@ -500,6 +510,12 @@ namespace PC {
 			return result;
 		}
 
+		Vector2<T> operator*(const Vector2<T>& v) const {
+			T newX = matrix[0][0] * v.x + matrix[0][1] * v.y + matrix[0][2];
+			T newY = matrix[1][0] * v.x + matrix[1][1] * v.y + matrix[1][2];
+			return Vector2<T>(newX, newY);
+		}
+
 		bool operator==(const Matrix3x3& other) const {
 			for (int i = 0; i < rows; ++i) {
 				for (int j = 0; j < columns; ++j) {
@@ -531,6 +547,10 @@ namespace PC {
 			T g = matrix[2][0], h = matrix[2][1], i = matrix[2][2];
 
 			return a * e * i + b * f * g + c * d * h - c * e * g - b * d * i - a * f * h;
+		}
+
+		Vector2<T> getCol(int col) const {
+			return Vector2<T>(matrix[0][col], matrix[1][col]);
 		}
 
 		Vector2<T> getTranslation() {
@@ -667,6 +687,12 @@ namespace PC {
 			return result;
 		}
 
+		Vector3<T> operator*(const Vector3<T>& v) const {
+			T newX = matrix[0][0] * v.x + matrix[0][1] * v.y + matrix[0][2] * v.z + matrix[0][3];
+			T newY = matrix[1][0] * v.x + matrix[1][1] * v.y + matrix[1][2] * v.z + matrix[1][3];
+			T newZ = matrix[2][0] * v.x + matrix[2][1] * v.y + matrix[2][2] * v.z + matrix[2][3];
+			return Vector3<T>(newX, newY, newZ);
+		}
 
 		bool operator==(const Matrix4x4& other) const {
 			for (int i = 0; i < rows; ++i) {
@@ -742,6 +768,10 @@ namespace PC {
 				}
 				return result;
 			}
+		}
+
+		Vector3<T> getCol(int col) const {
+			return Vector3<T>(matrix[0][col], matrix[1][col], matrix[2][col]);
 		}
 
 		// Assumes matrix is composed in order: Scale, then Rotate, then Translate

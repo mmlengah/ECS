@@ -18,6 +18,7 @@
 
 /*
 TODO:
+SMAA or FXAA
 Collision scripts
 Collision layer
 Collision with rotation
@@ -504,6 +505,34 @@ public:
     }
 };
 
+struct OBB {
+    Vector2f center;
+    Vector2f extents;
+    Matrix3x3f rotationMatrix;
+
+    OBB() = default;
+    OBB(const Vector2f& center, const Vector2f& extents, const Matrix3x3f& rotationMatrix)
+        : center(center), extents(extents), rotationMatrix(rotationMatrix) { }
+
+    void projectOntoAxis(const Vector2f& axis, float& min, float& max) const {
+        Vector2f vertices[4] = {
+            center + (rotationMatrix * (extents * Vector2f(1, 1))),
+            center + (rotationMatrix * (extents * Vector2f(1, -1))),
+            center + (rotationMatrix * (extents * Vector2f(-1, -1))),
+            center + (rotationMatrix * (extents * Vector2f(-1, 1)))
+        };
+
+        min = max = axis.dotProduct(vertices[0]);
+
+        for (int i = 1; i < 4; i++) {
+            float projection = axis.dotProduct(vertices[i]);
+
+            if (projection < min) min = projection;
+            else if (projection > max) max = projection;
+        }
+    }
+};
+
 class BoxColliderComponent : public Component {
 public:
     BoxColliderComponent() : customCollider(false) { }
@@ -537,10 +566,18 @@ public:
 
         return { 0, 0, 0, 0 };
     }
+
+    OBB getWorldSpaceOBB() {
+        SDL_Rect temp = getWorldSpaceRect();
+        TransformComponent* transform = owner->getComponent<TransformComponent>();
+        return OBB(Vector2f(static_cast<float>(temp.x), static_cast<float>(temp.y)),
+            Vector2f(static_cast<float>(temp.w) / 2, static_cast<float>(temp.h) / 2),
+            Matrix3x3f::Matrix3x3FromRotation(transform->getRotation()));
+    }
+
 private:
     Rectangle rect;
     bool customCollider;
-
     std::vector<std::function<void(Entity*, Entity*)>> collisionHandlers;
 };
 
@@ -843,21 +880,48 @@ private:
         SDL_Rect rectA = boxA->getWorldSpaceRect();
         SDL_Rect rectB = boxB->getWorldSpaceRect();
 
-        if (SDL_HasIntersection(&rectA, &rectB)) {
-            // Assuming entityA is the player and entityB is the wall
+        OBB obbA = boxA->getWorldSpaceOBB();
+        OBB obbB = boxB->getWorldSpaceOBB();
 
-            // Get the entities' transform components
+        AABB(rectA, rectB, entityA, entityB);
+    }
+
+    bool checkOBBOverlap(const OBB& obbA, const OBB& obbB) {
+        Vector2f axis[4];
+        axis[0] = obbA.rotationMatrix.getCol(0); // Axis 1
+        axis[1] = obbA.rotationMatrix.getCol(1); // Axis 2
+        axis[2] = obbB.rotationMatrix.getCol(0); // Axis 3
+        axis[3] = obbB.rotationMatrix.getCol(1); // Axis 4
+
+        for (int i = 0; i < 4; i++) {
+            float minOBB1, maxOBB1, minOBB2, maxOBB2;
+
+            obbA.projectOntoAxis(axis[i], minOBB1, maxOBB1);
+            obbB.projectOntoAxis(axis[i], minOBB2, maxOBB2);
+
+            if (maxOBB1 < minOBB2 || maxOBB2 < minOBB1) {
+                return false; // Separating axis found
+            }
+        }
+
+        return true; // No separating axis found, the OBBs intersect
+    }
+
+    void AABB(SDL_Rect& rectA, SDL_Rect& rectB, Entity* entityA, Entity* entityB) {
+        if (SDL_HasIntersection(&rectA, &rectB)) {
             TransformComponent* transformA = entityA->getComponent<TransformComponent>();
             TransformComponent* transformB = entityB->getComponent<TransformComponent>();
+            PhysicsComponent* physicsA = entityA->getComponent<PhysicsComponent>();
+            PhysicsComponent* physicsB = entityB->getComponent<PhysicsComponent>();
+            ScriptComponent* scriptA = entityA->getComponent<ScriptComponent>();
+            ScriptComponent* scriptB = entityB->getComponent<ScriptComponent>();
 
-            // Calculate the depth of the intersection on both axes
             int xOverlap = std::min(rectA.x + rectA.w, rectB.x + rectB.w) - std::max(rectA.x, rectB.x);
             int yOverlap = std::min(rectA.y + rectA.h, rectB.y + rectB.h) - std::max(rectA.y, rectB.y);
 
             Vector2f tA = transformA->getPosition();
             Vector2f tB = transformB->getPosition();
 
-            // Resolve collision by pushing the entities out of collision along the axis of least overlap
             if (!physicsA->isStatic) {
                 if (xOverlap < yOverlap) {
                     if (rectA.x < rectB.x) tA.x -= xOverlap;
@@ -883,7 +947,6 @@ private:
             transformA->setPosition(tA);
             transformB->setPosition(tB);
 
-            // After separating entities, apply conservation of momentum to calculate new velocities
             float totalMass = (physicsA->isStatic) ? physicsB->mass : (physicsB->isStatic) ? physicsA->mass : physicsA->mass + physicsB->mass;
             if (!physicsA->isStatic && !physicsB->isStatic) {
                 Vector2f velocityA = physicsA->velocity;
@@ -894,11 +957,11 @@ private:
             }
             else if (!physicsA->isStatic) {
                 Vector2f velocityA = physicsA->velocity;
-                physicsA->velocity = velocityA - 2 * (velocityA - Vector2f(0, 0));  // As physicsB is static, we do not consider its mass
+                physicsA->velocity = velocityA - 2 * (velocityA - Vector2f(0, 0));
             }
             else if (!physicsB->isStatic) {
                 Vector2f velocityB = physicsB->velocity;
-                physicsB->velocity = velocityB - 2 * (velocityB - Vector2f(0, 0));  // As physicsA is static, we do not consider its mass
+                physicsB->velocity = velocityB - 2 * (velocityB - Vector2f(0, 0));
             }
 
             if (scriptA) {
@@ -907,9 +970,9 @@ private:
             if (scriptB) {
                 scriptB->handleCollision(entityA);
             }
-            
         }
     }
+
 };
 
 class PhysicsSystem : public System {
