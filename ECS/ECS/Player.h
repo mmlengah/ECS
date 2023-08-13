@@ -78,6 +78,7 @@ public:
     void update(float deltaTime) override {
         transform->setPosition({ transform->getPosition().x + velocity->dx * deltaTime,
                                 transform->getPosition().y + velocity->dy * deltaTime });
+
     }
 private:
     VelocityComponent* velocity;
