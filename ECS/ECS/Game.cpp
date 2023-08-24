@@ -80,6 +80,7 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
 
     Rectangle a = { 10, 10 };
     SDL_Color white = { 255, 255, 255, 255 };
+    SDL_Color orange = { 255, 165, 0, 255 };
 
     auto box = Entity::create();
     box->addComponent<TransformComponent>(Vector2f(0, 0), 0.0f, Vector2f(2.0f, 2.0f));
@@ -89,9 +90,9 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
 
     auto box2 = Entity::create();
     box2->addComponent<TransformComponent>(Vector2f(620, 0), 0.0f, Vector2f(3.0f, 3.0f));
-    box2->addComponent<SquareComponent>(a, white);
+    box2->addComponent<SquareComponent>(a, orange);
     box2->addComponent<BoxColliderComponent>();
-    box2->addComponent<PhysicsComponent>(10.f, false, true);
+    box2->addComponent<PhysicsComponent>(10.f, true, false);
 
     auto box3 = Entity::create();
     box3->addComponent<TransformComponent>(Vector2f(0, 460), 0.0f, Vector2f(2.0f, 2.0f));

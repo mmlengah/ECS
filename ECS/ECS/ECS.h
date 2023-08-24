@@ -18,6 +18,7 @@
 
 /*
 TODO:
+FXAA / SSAA 
 Collision scripts
 Collision layer
 Collision matrix
@@ -626,6 +627,7 @@ public:
         velocity(0, 0), acceleration(0, 0)
     {
         if (isStatic) {
+            isAffectedByGravity = false;
             mass = std::numeric_limits<float>::infinity();
             inverseMass = 0;   // for static objects, inverse mass is zero
         }
