@@ -22,7 +22,6 @@ FXAA / SSAA
 Collision scripts
 Collision layer
 Collision matrix
-floor doesn't work objects bounce forever
 Sound
 Light
 Particles
@@ -35,6 +34,8 @@ class Component;
 class System;
 
 class Entity : public std::enable_shared_from_this<Entity> {
+public:
+    std::string name = "";
 private:
     inline static std::vector<std::shared_ptr<Entity>> allEntities = {};
     std::unordered_map<std::type_index, std::unique_ptr<Component>> components;
@@ -620,11 +621,12 @@ public:
     float restitution;   // added this
     bool isStatic;
     bool isAffectedByGravity;
+    bool isGrounded;
     float damping = 0.99f;
 
     PhysicsComponent(float mass, bool isAffectedByGravity = true, bool isStatic = false, float restitution = 0.5f)
         : mass(mass), restitution(restitution), isAffectedByGravity(isAffectedByGravity), isStatic(isStatic),
-        velocity(0, 0), acceleration(0, 0)
+        velocity(0, 0), acceleration(0, 0), isGrounded(false)
     {
         if (isStatic) {
             isAffectedByGravity = false;
@@ -639,6 +641,7 @@ public:
     void applyForce(const Vector2f& force) {
         if (!isStatic) {
             acceleration += force / mass;
+            isGrounded = false;
         }
     }
 };
@@ -958,6 +961,11 @@ private:
 
         auto [isOverlapping, mtv] = checkOBBCollisionAndGetMTV(obbA, obbB);
         if (isOverlapping) {
+            if (abs(mtv.x) < 0.01f && mtv.y > 0 && physicsA->velocity.y > 0) {
+                physicsA->velocity.y = 0;  // Reset the downward velocity
+                physicsA->isGrounded = true;
+            }
+
             float minOverlap = std::numeric_limits<float>::max();
 
             // Compute the axes for SAT
@@ -1019,6 +1027,9 @@ private:
 
                 physicsA->velocity = velocityA - 2 * physicsB->mass / totalMass * (velocityA - velocityB);
                 physicsB->velocity = velocityB - 2 * physicsA->mass / totalMass * (velocityB - velocityA);
+
+                physicsA->isGrounded = false;
+                physicsB->isGrounded = false;
             }
 
             // Call collision handlers for the scripts
@@ -1040,7 +1051,7 @@ public:
         for (Entity* entity : entities) {
             PhysicsComponent* physics = entity->getComponent<PhysicsComponent>();
             if (physics && !physics->isStatic) {
-                if (physics->isAffectedByGravity) {
+                if (physics->isAffectedByGravity && !physics->isGrounded) {
                     // Apply gravity
                     physics->applyForce(gravity * physics->mass);
                 }

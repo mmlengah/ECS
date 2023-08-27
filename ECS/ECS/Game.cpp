@@ -89,6 +89,7 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     box->addComponent<PhysicsComponent>(10.0f, false, true);
 
     auto box2 = Entity::create();
+    box2->name = "orange";
     box2->addComponent<TransformComponent>(Vector2f(620, 0), 0.0f, Vector2f(3.0f, 3.0f));
     box2->addComponent<SquareComponent>(a, orange);
     box2->addComponent<BoxColliderComponent>();
