@@ -18,7 +18,6 @@
 
 /*
 TODO:
-FXAA / SSAA 
 Collision scripts
 Collision layer
 Collision matrix
@@ -707,15 +706,26 @@ public:
     SDL_Renderer* renderer;
     std::map<int, std::vector<Entity*>> renderLayers;
 
-    RenderSystem(bool showColliders = false) : renderer(Renderer::Instance().Get()),
-        showColliders(showColliders) 
+    RenderSystem(bool showColliders = false, int ssaaFactor = 2) :
+        renderer(Renderer::Instance().Get()),
+        showColliders(showColliders), ssaaFactor(ssaaFactor)
     {
     #ifdef NDEBUG
         showColliders = false;
     #endif
+
+        int windowWidth, windowHeight;
+        SDL_GetWindowSize(Renderer::Instance().GetWindow(), &windowWidth, &windowHeight);
+
+        // Create the supersampled texture
+        ssaaTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, windowWidth * ssaaFactor, windowHeight * ssaaFactor);
     }
 
     void update(float deltaTime) {
+        int windowWidth, windowHeight;
+        SDL_GetWindowSize(Renderer::Instance().GetWindow(), &windowWidth, &windowHeight);
+        SDL_SetRenderTarget(renderer, ssaaTexture);
+
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
 
@@ -767,6 +777,15 @@ public:
             
         }
 
+        // Now, reset to the default render target
+        SDL_SetRenderTarget(renderer, NULL);
+
+        // Draw the supersampled texture to the default render target
+        SDL_Rect srcRect = { 0, 0, windowWidth * ssaaFactor, windowHeight * ssaaFactor };
+        SDL_Rect dstRect = { 0, 0, windowWidth, windowHeight };
+        SDL_RenderCopy(renderer, ssaaTexture, &srcRect, &dstRect);
+
+        // Present the final rendering to the window
         SDL_RenderPresent(renderer);
     }
 
@@ -782,9 +801,9 @@ public:
             }
         }
     }
-
-
 private:
+    SDL_Texture* ssaaTexture;
+    int ssaaFactor;
     bool showColliders;
 private:
 #ifdef _DEBUG

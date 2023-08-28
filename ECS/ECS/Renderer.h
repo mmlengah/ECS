@@ -10,6 +10,7 @@ public:
     
     void Initialize(SDL_Window* window);
 
+    SDL_Window* GetWindow() const;
 private:
     Renderer();
     ~Renderer();
@@ -20,4 +21,6 @@ private:
     Renderer& operator=(Renderer&&) = delete;
 
     std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)> renderer;
+
+    SDL_Window* window = nullptr;
 };
