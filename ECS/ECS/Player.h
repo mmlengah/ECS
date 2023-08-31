@@ -150,6 +150,15 @@ private:
     SpriteComponent* sprite;
 };
 
+class PlayerCollisionScript : public Script {
+public:
+    void onCollisionExit(Entity* other) override {
+        if (other->name == "orange") {
+            std::cout << "collision with orange ended" << std::endl;
+        }
+    }
+};
+
 std::shared_ptr<Entity> createPlayerPrefab() {
     // Create a new entity
     std::shared_ptr<Entity> player = Entity::create();
@@ -173,6 +182,7 @@ std::shared_ptr<Entity> createPlayerPrefab() {
     scriptComponent->addScript(std::make_shared<PlayerAnimationScript>());
     scriptComponent->addScript(std::make_shared<PlayerMovementScript>());
     scriptComponent->addScript(std::make_shared<PlayerInputScript>());
+    scriptComponent->addScript(std::make_shared<PlayerCollisionScript>());
 
     physics->damping = 0.1f;
 

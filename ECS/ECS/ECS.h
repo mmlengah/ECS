@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <limits>
 #include <cmath>  
+#include <set>
+#include <utility>
 #include <SDL.h>
 #include <SDL_image.h>
 #include "PCM.h"
@@ -18,7 +20,6 @@
 
 /*
 TODO:
-Collision scripts
 Collision layer
 Collision matrix
 Sound
@@ -664,8 +665,12 @@ public:
     
     }
 
-    virtual void handleCollision(Entity* other) {
+    virtual void onCollision(Entity* other) {
     
+    }
+
+    virtual void onCollisionExit(Entity* other) {
+
     }
 
     void setEntity(Entity* entity) {
@@ -692,9 +697,15 @@ public:
         }
     }
 
-    void handleCollision(Entity* other) {
+    void onCollision(Entity* other) {
         for (auto script : scripts) {
-            script->handleCollision(other);
+            script->onCollision(other);
+        }
+    }
+
+    void onCollisionExit(Entity* other) {
+        for (auto script : scripts) {
+            script->onCollisionExit(other);
         }
     }
 private:
@@ -1053,13 +1064,33 @@ private:
 
             // Call collision handlers for the scripts
             if (scriptA) {
-                scriptA->handleCollision(entityB);
+                scriptA->onCollision(entityB);
             }
             if (scriptB) {
-                scriptB->handleCollision(entityA);
+                scriptB->onCollision(entityA);
+            }
+
+            currentCollisions.insert({ entityA, entityB });
+        }
+        else {
+            // Check if they were colliding in the previous frame
+            if (currentCollisions.count({ entityA, entityB }) > 0) {
+                // Remove from current collisions set
+                currentCollisions.erase({ entityA, entityB });
+
+                // Call onCollisionExit for both entities
+                if (scriptA) {
+                    scriptA->onCollisionExit(entityB);
+                }
+                if (scriptB) {
+                    scriptB->onCollisionExit(entityA);
+                }
             }
         }
     }
+
+private:
+    std::set<std::pair<Entity*, Entity*>> currentCollisions;
 };
 
 class PhysicsSystem : public System {

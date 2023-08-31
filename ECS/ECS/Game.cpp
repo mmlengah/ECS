@@ -16,7 +16,7 @@ public:
         physics->applyForce(Vector2f(speed, 0.0f) * deltaTime);
     }
 
-    void handleCollision(Entity* other) override {
+    void onCollision(Entity* other) override {
         speed = 0;
         physics->isAffectedByGravity = true;
     }
