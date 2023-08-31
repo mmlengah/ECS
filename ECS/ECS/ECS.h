@@ -20,8 +20,8 @@
 
 /*
 TODO:
-Collision layer
-Collision matrix
+Scene Management
+Tilemap
 Sound
 Light
 Particles
@@ -560,6 +560,46 @@ struct OBB {
 
 };
 
+enum CollisionLayer {
+    Default = 0,
+    LayerOne,
+    LayerTwo,
+    LayerThree,
+    LayerFour,
+    LayerFive,
+    LayerSix,
+    LayerSeven,
+    LayerEight,
+    LayerNine,
+    LastLayer,
+};
+
+class CollisionMatrix {
+public:
+    CollisionMatrix() {
+        // By default, all layers collide with each other
+        for (int i = 0; i < LastLayer; i++) {
+            for (int j = 0; j < LastLayer; j++) {
+                matrix[i][j] = true;
+            }
+        }
+    }
+
+    // Set if two layers should collide
+    void setShouldCollide(CollisionLayer layer1, CollisionLayer layer2, bool shouldCollide) {
+        matrix[layer1][layer2] = shouldCollide;
+        matrix[layer2][layer1] = shouldCollide; // Ensure symmetry
+    }
+
+    // Check if two layers should collide
+    bool shouldCollide(CollisionLayer layer1, CollisionLayer layer2) const {
+        return matrix[layer1][layer2];
+    }
+
+private:
+    bool matrix[LastLayer][LastLayer];
+};
+
 class BoxColliderComponent : public Component {
 public:
     BoxColliderComponent() : customCollider(false) { }
@@ -606,10 +646,18 @@ public:
             Matrix3x3f::Matrix3x3FromRotation(transform->getRotation()));
     }
 
+    void setLayer(CollisionLayer layer) {
+        this->layer = layer;
+    }
+
+    CollisionLayer getLayer() const {
+        return layer;
+    }
 private:
     Rectangle rect;
     bool customCollider;
     std::vector<std::function<void(Entity*, Entity*)>> collisionHandlers;
+    CollisionLayer layer = Default;
 };
 
 class PhysicsComponent : public Component {
@@ -976,13 +1024,87 @@ private:
         return { true, mtv };
     }
 
-    void OBBCollision(Entity* entityA, Entity* entityB) {
-        BoxColliderComponent* boxA = entityA->getComponent<BoxColliderComponent>();
-        BoxColliderComponent* boxB = entityB->getComponent<BoxColliderComponent>();
+    void resolveAndRespondToCollision(Entity* entityA, Entity* entityB, OBB obbA, OBB obbB, Vector2f& mtv) {
         TransformComponent* transformA = entityA->getComponent<TransformComponent>();
         TransformComponent* transformB = entityB->getComponent<TransformComponent>();
         PhysicsComponent* physicsA = entityA->getComponent<PhysicsComponent>();
         PhysicsComponent* physicsB = entityB->getComponent<PhysicsComponent>();
+        if (abs(mtv.x) < 0.01f && mtv.y > 0 && physicsA->velocity.y > 0) {
+            physicsA->velocity.y = 0;  // Reset the downward velocity
+            physicsA->isGrounded = true;
+        }
+
+        float minOverlap = std::numeric_limits<float>::max();
+
+        // Compute the axes for SAT
+        std::vector<Vector2f> axes = obbA.getAxes();
+        std::vector<Vector2f> axesB = obbB.getAxes();
+        axes.insert(axes.end(), axesB.begin(), axesB.end());
+
+        // Check overlap along each axis
+        for (Vector2f& axis : axes) {
+            float minA, maxA, minB, maxB;
+
+            obbA.projectOntoAxis(axis, minA, maxA);
+            obbB.projectOntoAxis(axis, minB, maxB);
+
+            float overlap = std::min(maxA, maxB) - std::max(minA, minB);
+
+            // If no overlap found on any axis, no collision
+            if (overlap <= 0) {
+                return;
+            }
+            else {
+                if (overlap < minOverlap) {
+                    minOverlap = overlap;
+                    if (maxB - minA < maxA - minB) {
+                        mtv = -axis * overlap;
+                    }
+                    else {
+                        mtv = axis * overlap;
+                    }
+                }
+            }
+        }
+
+        // Translate entities by the MTV to resolve the collision
+        Vector2f posA = transformA->getPosition();
+        Vector2f posB = transformB->getPosition();
+
+        //std::cout << mtv << std::endl;
+        if (!physicsA->isStatic && !physicsB->isStatic) {
+            posA -= mtv * 0.5f;
+            posB += mtv * 0.5f;
+        }
+        else if (!physicsA->isStatic) {
+            posA -= mtv;
+        }
+        else if (!physicsB->isStatic) {
+            posB += mtv;
+        }
+
+        transformA->setPosition(posA);
+        transformB->setPosition(posB);
+
+        // Collision response (adjust velocities, etc.)
+        // This can be expanded further for more realistic response.
+        if (!physicsA->isStatic && !physicsB->isStatic) {
+            float totalMass = physicsA->mass + physicsB->mass;
+            Vector2f velocityA = physicsA->velocity;
+            Vector2f velocityB = physicsB->velocity;
+
+            physicsA->velocity = velocityA - 2 * physicsB->mass / totalMass * (velocityA - velocityB);
+            physicsB->velocity = velocityB - 2 * physicsA->mass / totalMass * (velocityB - velocityA);
+
+            physicsA->isGrounded = false;
+            physicsB->isGrounded = false;
+        }
+    }
+
+    void OBBCollision(Entity* entityA, Entity* entityB) {
+        BoxColliderComponent* boxA = entityA->getComponent<BoxColliderComponent>();
+        BoxColliderComponent* boxB = entityB->getComponent<BoxColliderComponent>();
+        
         ScriptComponent* scriptA = entityA->getComponent<ScriptComponent>();
         ScriptComponent* scriptB = entityB->getComponent<ScriptComponent>();
 
@@ -991,76 +1113,9 @@ private:
 
         auto [isOverlapping, mtv] = checkOBBCollisionAndGetMTV(obbA, obbB);
         if (isOverlapping) {
-            if (abs(mtv.x) < 0.01f && mtv.y > 0 && physicsA->velocity.y > 0) {
-                physicsA->velocity.y = 0;  // Reset the downward velocity
-                physicsA->isGrounded = true;
-            }
-
-            float minOverlap = std::numeric_limits<float>::max();
-
-            // Compute the axes for SAT
-            std::vector<Vector2f> axes = obbA.getAxes();
-            std::vector<Vector2f> axesB = obbB.getAxes();
-            axes.insert(axes.end(), axesB.begin(), axesB.end());
-
-            // Check overlap along each axis
-            for (Vector2f& axis : axes) {
-                float minA, maxA, minB, maxB;
-
-                obbA.projectOntoAxis(axis, minA, maxA);
-                obbB.projectOntoAxis(axis, minB, maxB);
-
-                float overlap = std::min(maxA, maxB) - std::max(minA, minB);
-
-                // If no overlap found on any axis, no collision
-                if (overlap <= 0) {
-                    return;
-                }
-                else {
-                    if (overlap < minOverlap) {
-                        minOverlap = overlap;
-                        if (maxB - minA < maxA - minB) {
-                            mtv = -axis * overlap;
-                        }
-                        else {
-                            mtv = axis * overlap;
-                        }
-                    }
-                }
-            }
-
-            // Translate entities by the MTV to resolve the collision
-            Vector2f posA = transformA->getPosition();
-            Vector2f posB = transformB->getPosition();
-
-            //std::cout << mtv << std::endl;
-            if (!physicsA->isStatic && !physicsB->isStatic) {
-                posA -= mtv * 0.5f;
-                posB += mtv * 0.5f;
-            }
-            else if (!physicsA->isStatic) {
-                posA -= mtv;
-            }
-            else if (!physicsB->isStatic) {
-                posB += mtv;
-            }
-
-            transformA->setPosition(posA);
-            transformB->setPosition(posB);
-
-            // Collision response (adjust velocities, etc.)
-            // This can be expanded further for more realistic response.
-            if (!physicsA->isStatic && !physicsB->isStatic) {
-                float totalMass = physicsA->mass + physicsB->mass;
-                Vector2f velocityA = physicsA->velocity;
-                Vector2f velocityB = physicsB->velocity;
-
-                physicsA->velocity = velocityA - 2 * physicsB->mass / totalMass * (velocityA - velocityB);
-                physicsB->velocity = velocityB - 2 * physicsA->mass / totalMass * (velocityB - velocityA);
-
-                physicsA->isGrounded = false;
-                physicsB->isGrounded = false;
-            }
+            if (collisionMatrix.shouldCollide(boxA->getLayer(), boxB->getLayer())) {
+                resolveAndRespondToCollision(entityA, entityB, obbA, obbB, mtv);
+            }          
 
             // Call collision handlers for the scripts
             if (scriptA) {
@@ -1089,8 +1144,11 @@ private:
         }
     }
 
+public:
+    CollisionMatrix collisionMatrix;
 private:
     std::set<std::pair<Entity*, Entity*>> currentCollisions;
+    
 };
 
 class PhysicsSystem : public System {

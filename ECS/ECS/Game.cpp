@@ -75,6 +75,8 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     collisionSystem = &(systemManager->registerSystem<CollisionSystem>());
     physicsSystem = &(systemManager->registerSystem<PhysicsSystem>());
     scriptSystem = &(systemManager->registerSystem<ScriptSystem>());
+
+    collisionSystem->collisionMatrix.setShouldCollide(Default, Default, false);
     
     player = createPlayerPrefab();
 
@@ -106,6 +108,7 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     box4->addComponent<SquareComponent>(a, white);
     box4->addComponent<BoxColliderComponent>();
     box4->addComponent<PhysicsComponent>(10.f, false, true);
+    box4->getComponent<BoxColliderComponent>()->setLayer(LayerOne);
 
     SDL_Color blue = { 0, 0, 255, 255 };
     auto box5 = Entity::create();

@@ -157,6 +157,12 @@ public:
             std::cout << "collision with orange ended" << std::endl;
         }
     }
+
+    void onCollision(Entity* other) override {
+        if (other->name == "orange") {
+            std::cout << "collision with orange" << std::endl;
+        }
+    }
 };
 
 std::shared_ptr<Entity> createPlayerPrefab() {
