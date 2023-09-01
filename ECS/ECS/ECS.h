@@ -20,7 +20,9 @@
 
 /*
 TODO:
-Scene Management
+Scene unloading
+prefab creation
+making prefabs mid game
 Tilemap
 Sound
 Light
@@ -947,9 +949,9 @@ private:
 
 class WorldSpaceSystem : public System {
 public:
-    Camera* cam;
+    std::shared_ptr<Camera> cam; 
 
-    WorldSpaceSystem(Camera* cam) : cam(cam) {}
+    WorldSpaceSystem(std::shared_ptr<Camera> cam) : cam(cam) {}
 
     void update() {
         for (auto it = entities.begin(); it != entities.end(); ++it) {
