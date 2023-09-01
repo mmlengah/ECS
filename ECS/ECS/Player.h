@@ -7,6 +7,10 @@ using namespace PC;
 
 class PlayerAnimationScript : public Script {
 public:
+    PlayerAnimationScript()
+        : velocity(nullptr), transform(nullptr), sprite(nullptr) {
+    }
+
     void start() override {
         velocity = entity->getComponent<VelocityComponent>();
         transform = entity->getComponent<TransformComponent>();
@@ -70,6 +74,8 @@ private:
 
 class PlayerMovementScript : public Script {
 public:
+    PlayerMovementScript() : velocity(nullptr), transform(nullptr) {}
+
     void start() override {
         velocity = entity->getComponent<VelocityComponent>();
         transform = entity->getComponent<TransformComponent>();
@@ -87,6 +93,8 @@ private:
 
 class PlayerInputScript : public Script {
 public:
+    PlayerInputScript() : velocity(nullptr), transform(nullptr), sprite(nullptr) {}
+
     void start() override {
         velocity = entity->getComponent<VelocityComponent>();
         transform = entity->getComponent<TransformComponent>();

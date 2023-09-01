@@ -7,6 +7,8 @@
 
 class BoxMovementScript : public Script {
 public:
+    BoxMovementScript() : speed(1000.0f), transform(nullptr), physics(nullptr) {}
+
     void start() override {
         transform = entity->getComponent<TransformComponent>();
         physics = entity->getComponent<PhysicsComponent>();
@@ -29,7 +31,7 @@ public:
         return speed;
     }
 private:
-    float speed = 1000.0f;
+    float speed;
     TransformComponent* transform;
     PhysicsComponent* physics;
 };
