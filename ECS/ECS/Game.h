@@ -3,7 +3,6 @@
 #include <memory>
 #include "Camera.h"
 #include "ECS.h"
-#include "Scene.h"
 
 class Game {
 public:
@@ -23,9 +22,14 @@ private:
     Uint32 oldTime, currentTime;
     float deltaTime;
     std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> win;
+    std::unique_ptr<SystemManager> systemManager;
+    RenderSystem* renderSystem;    
+    WorldSpaceSystem* worldSpaceSystem;
+    CollisionSystem* collisionSystem;
+    PhysicsSystem* physicsSystem;
+    ScriptSystem* scriptSystem;
     Camera* cam;
-    /*std::shared_ptr<Entity> player;*/
-    SceneManager* sceneManager;
+    std::shared_ptr<Entity> player;
 };
 
 

@@ -161,7 +161,6 @@ xcopy /D /Y "$(SolutionDir)Dependancies\SDL2_image\lib\x64\*.dll" "$(TargetDir)"
     <ClInclude Include="PCTP.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Renderer.h" />
-    <ClInclude Include="Scene.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
