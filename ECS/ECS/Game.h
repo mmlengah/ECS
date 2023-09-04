@@ -23,12 +23,12 @@ private:
     float deltaTime;
     std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> win;
     std::unique_ptr<SystemManager> systemManager;
-    RenderSystem* renderSystem;    
-    WorldSpaceSystem* worldSpaceSystem;
-    CollisionSystem* collisionSystem;
-    PhysicsSystem* physicsSystem;
-    ScriptSystem* scriptSystem;
-    Camera* cam;
+    std::shared_ptr<RenderSystem> renderSystem;
+    std::shared_ptr<WorldSpaceSystem> worldSpaceSystem;
+    std::shared_ptr<CollisionSystem> collisionSystem;
+    std::shared_ptr<PhysicsSystem> physicsSystem;
+    std::shared_ptr<ScriptSystem> scriptSystem;
+    std::shared_ptr<Camera> cam;
     std::shared_ptr<Entity> player;
 };
 

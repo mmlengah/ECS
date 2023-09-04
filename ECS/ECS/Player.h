@@ -1,5 +1,6 @@
 #pragma once
 #include <SDL.h>
+#include <memory>
 #include "ECS.h"
 #include "PCM.h"
 
@@ -12,9 +13,9 @@ public:
     }
 
     void start() override {
-        velocity = entity->getComponent<VelocityComponent>();
-        transform = entity->getComponent<TransformComponent>();
-        sprite = entity->getComponent<SpriteComponent>();
+        velocity = entity.lock()->getComponent<VelocityComponent>();
+        transform = entity.lock()->getComponent<TransformComponent>();
+        sprite = entity.lock()->getComponent<SpriteComponent>();
 
         sprite->addAnimationState("idleFront", AnimationState(6 * 0, 6, 125));
         sprite->addAnimationState("idleRight", AnimationState(6 * 1, 6, 125));
@@ -67,9 +68,9 @@ public:
     }
 
 private:
-    VelocityComponent* velocity;
-    TransformComponent* transform;
-    SpriteComponent* sprite;
+    std::shared_ptr<VelocityComponent> velocity;
+    std::shared_ptr<TransformComponent> transform;
+    std::shared_ptr<SpriteComponent> sprite;
 };
 
 class PlayerMovementScript : public Script {
@@ -77,8 +78,8 @@ public:
     PlayerMovementScript() : velocity(nullptr), transform(nullptr) {}
 
     void start() override {
-        velocity = entity->getComponent<VelocityComponent>();
-        transform = entity->getComponent<TransformComponent>();
+        velocity = entity.lock()->getComponent<VelocityComponent>();
+        transform = entity.lock()->getComponent<TransformComponent>();
     }
 
     void update(float deltaTime) override {
@@ -87,8 +88,8 @@ public:
 
     }
 private:
-    VelocityComponent* velocity;
-    TransformComponent* transform;
+    std::shared_ptr<VelocityComponent> velocity;
+    std::shared_ptr<TransformComponent> transform;
 };
 
 class PlayerInputScript : public Script {
@@ -96,9 +97,9 @@ public:
     PlayerInputScript() : velocity(nullptr), transform(nullptr), sprite(nullptr) {}
 
     void start() override {
-        velocity = entity->getComponent<VelocityComponent>();
-        transform = entity->getComponent<TransformComponent>();
-        sprite = entity->getComponent<SpriteComponent>();
+        velocity = entity.lock()->getComponent<VelocityComponent>();
+        transform = entity.lock()->getComponent<TransformComponent>();
+        sprite = entity.lock()->getComponent<SpriteComponent>();
     }
 
     void update(float deltaTime) override {        
@@ -153,20 +154,20 @@ public:
         
     }
 private:
-    VelocityComponent* velocity;
-    TransformComponent* transform;
-    SpriteComponent* sprite;
+    std::shared_ptr<VelocityComponent> velocity;
+    std::shared_ptr<TransformComponent> transform;
+    std::shared_ptr<SpriteComponent> sprite;
 };
 
 class PlayerCollisionScript : public Script {
 public:
-    void onCollisionExit(Entity* other) override {
+    void onCollisionExit(const std::shared_ptr<Entity>& other) override {
         if (other->name == "orange") {
             std::cout << "collision with orange ended" << std::endl;
         }
     }
 
-    void onCollision(Entity* other) override {
+    void onCollision(const std::shared_ptr<Entity>& other) override {
         if (other->name == "orange") {
             std::cout << "collision with orange" << std::endl;
         }
@@ -187,16 +188,19 @@ std::shared_ptr<Entity> createPlayerPrefab() {
     player->addComponent<ScriptComponent>();
 
     // Get the InputComponent and bind keys to commands
-    VelocityComponent* velocity = player->getComponent<VelocityComponent>();
-    TransformComponent* transform = player->getComponent<TransformComponent>();
-    SpriteComponent* sprite = player->getComponent<SpriteComponent>();
-    PhysicsComponent* physics = player->getComponent<PhysicsComponent>();
-    ScriptComponent* scriptComponent = player->getComponent<ScriptComponent>();
+    auto velocity = player->getComponent<VelocityComponent>();
+    auto transform = player->getComponent<TransformComponent>();
+    auto sprite = player->getComponent<SpriteComponent>();
+    auto physics = player->getComponent<PhysicsComponent>();
+    auto script = player->getComponent<ScriptComponent>();
+    auto collider = player->getComponent<BoxColliderComponent>();
 
-    scriptComponent->addScript(std::make_shared<PlayerAnimationScript>());
-    scriptComponent->addScript(std::make_shared<PlayerMovementScript>());
-    scriptComponent->addScript(std::make_shared<PlayerInputScript>());
-    scriptComponent->addScript(std::make_shared<PlayerCollisionScript>());
+    collider->setLayer(LayerOne);
+
+    script->addScript(std::make_shared<PlayerAnimationScript>());
+    script->addScript(std::make_shared<PlayerMovementScript>());
+    script->addScript(std::make_shared<PlayerInputScript>());
+    script->addScript(std::make_shared<PlayerCollisionScript>());
 
     physics->damping = 0.1f;
 

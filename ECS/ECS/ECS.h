@@ -36,27 +36,27 @@ class System;
 class Entity : public std::enable_shared_from_this<Entity> {
 public:
     std::string name = "";
+
 private:
     inline static std::vector<std::shared_ptr<Entity>> allEntities = {};
-    std::unordered_map<std::type_index, std::unique_ptr<Component>> components;
+    std::unordered_map<std::type_index, std::shared_ptr<Component>> components;
 
-    // Make constructor private so it can't be called directly
     Entity() {}
 
 public:
     template <typename T, typename... TArgs>
-    T* addComponent(TArgs&&... args) {
-        T* comp = new T(std::forward<TArgs>(args)...);
-        comp->owner = this; // Set the owner of the component to this entity
-        components[std::type_index(typeid(T))] = std::unique_ptr<T>(comp);
+    std::shared_ptr<T> addComponent(TArgs&&... args) {
+        auto comp = std::make_shared<T>(std::forward<TArgs>(args)...);
+        comp->owner = this->shared_from_this(); // Set the owner of the component to this entity
+        components[std::type_index(typeid(T))] = comp;
         return comp;
     }
 
     template<typename T>
-    T* getComponent() {
+    std::shared_ptr<T> getComponent() {
         auto iter = components.find(typeid(T));
         if (iter != components.end()) {
-            return dynamic_cast<T*>(iter->second.get());
+            return std::dynamic_pointer_cast<T>(iter->second);
         }
         return nullptr;
     }
@@ -65,52 +65,71 @@ public:
         return allEntities;
     }
 
-    // Factory method to create a new Entity
     static std::shared_ptr<Entity> create() {
         std::shared_ptr<Entity> entity(new Entity());
         allEntities.push_back(entity);
         return entity;
     }
+
+    static void destroyAllEntities() {
+        allEntities.clear();
+    }
 };
 
 class Component {
 public:
-    Entity* owner;
+    std::weak_ptr<Entity> owner; // weak_ptr here to break the cyclic reference
+
     virtual ~Component() {}
 
-    Component() : owner(nullptr) {}
+    Component() = default;
 
     template <typename T>
-    T* getComponent() const {
-        return owner->getComponent<T>();
+    std::shared_ptr<T> getComponent() const {
+        if (auto sharedOwner = owner.lock()) {
+            return sharedOwner->getComponent<T>();
+        }
+        return nullptr;
     }
 };
 
 class System {
 public:
-    std::vector<Entity*> entities;
+    std::vector<std::weak_ptr<Entity>> entities; // weak_ptr here to ensure we don't unnecessarily keep entities alive
 
-    virtual void tryAddEntity(Entity* entity) = 0;
+    virtual void tryAddEntity(std::shared_ptr<Entity> entity) = 0;
 };
 
 class SystemManager {
 public:
-    std::vector<std::unique_ptr<System>> systems;
+    std::vector<std::shared_ptr<System>> systems;
 
     template<typename T, typename... TArgs>
-    T& registerSystem(TArgs&&... args) {
-        T* t = new T(std::forward<TArgs>(args)...);
+    std::shared_ptr<T> registerSystem(TArgs&&... args) {
+        auto t = std::make_shared<T>(std::forward<TArgs>(args)...);
         systems.emplace_back(t);
-        return *t;
+        return t;
     }
 
     void addAllEntitiesToSystems(std::vector<std::shared_ptr<Entity>>& allEntities) {
         for (auto& entity : allEntities) {
-            addEntityToSystems(entity.get());
+            addEntityToSystems(entity);
         }
     }
+
+    void resetAllEntities() {
+        for (auto& system : systems) {
+            system->entities.clear();
+        }
+        Entity::destroyAllEntities();
+    }
+
+    void resetScene() {
+        resetAllEntities();
+    }
+
 private:
-    void addEntityToSystems(Entity* entity) {
+    void addEntityToSystems(std::shared_ptr<Entity> entity) {
         for (auto& system : systems) {
             system->tryAddEntity(entity);
         }
@@ -415,7 +434,7 @@ public:
     }
 
     SDL_Rect getWorldSpaceRect() {
-        TransformComponent* transform = owner->getComponent<TransformComponent>();
+        auto transform = owner.lock()->getComponent<TransformComponent>();
         Matrix3x3f m = transform->getWorldSpaceMatrix();
 
         Vector2f pos = m.getTranslation();
@@ -490,7 +509,7 @@ public:
     }
 
     SDL_Rect getWorldSpaceRect() {
-        TransformComponent* transform = owner->getComponent<TransformComponent>();
+        auto transform = owner.lock()->getComponent<TransformComponent>();
         Matrix3x3f m = transform->getWorldSpaceMatrix();
 
         Vector2f pos = m.getTranslation();
@@ -609,11 +628,11 @@ public:
 
 
     SDL_Rect getWorldSpaceRect() {
-        SpriteComponent* sprite = owner->getComponent<SpriteComponent>();
-        SquareComponent* square = owner->getComponent<SquareComponent>();
+        auto sprite = owner.lock()->getComponent<SpriteComponent>();
+        auto square = owner.lock()->getComponent<SquareComponent>();
 
         if (customCollider) {            
-            TransformComponent* transform = owner->getComponent<TransformComponent>();
+            auto transform = owner.lock()->getComponent<TransformComponent>();
             Matrix3x3f m = transform->getWorldSpaceMatrix();
 
             Vector2f pos = m.getTranslation();
@@ -636,7 +655,7 @@ public:
 
     OBB getWorldSpaceOBB() {
         SDL_Rect temp = getWorldSpaceRect();
-        TransformComponent* transform = owner->getComponent<TransformComponent>();
+        auto transform = owner.lock()->getComponent<TransformComponent>();
 
         // Calculate the center of the rectangle
         Vector2f center(static_cast<float>(temp.x + temp.w / 2), static_cast<float>(temp.y + temp.h / 2));
@@ -703,56 +722,48 @@ public:
 
 class Script {
 public:
-    Entity* entity = nullptr;
+    std::weak_ptr<Entity> entity; // Using weak_ptr to break cyclic reference
 
-    virtual void start() {
-    
-    }
+    virtual void start() { }
 
-    virtual void update(float deltaTime) {
-    
-    }
+    virtual void update(float deltaTime) { }
 
-    virtual void onCollision(Entity* other) {
-    
-    }
+    virtual void onCollision(const std::shared_ptr<Entity>& other) { }
 
-    virtual void onCollisionExit(Entity* other) {
+    virtual void onCollisionExit(const std::shared_ptr<Entity>& other) { }
 
-    }
-
-    void setEntity(Entity* entity) {
-        this->entity = entity;
+    void setEntity(const std::shared_ptr<Entity>& entityPtr) {
+        this->entity = entityPtr;
     }
 };
 
 class ScriptComponent : public Component {
 public:
     void addScript(std::shared_ptr<Script> script) {
-        script->setEntity(owner);
+        script->setEntity(owner.lock()); // Convert weak_ptr to shared_ptr
         scripts.push_back(script);
     }
 
     void start() {
-        for (auto script : scripts) {
+        for (auto& script : scripts) {
             script->start();
         }
     }
 
     void update(float deltaTime) {
-        for (auto script : scripts) {
+        for (auto& script : scripts) {
             script->update(deltaTime);
         }
     }
 
-    void onCollision(Entity* other) {
-        for (auto script : scripts) {
+    void onCollision(const std::shared_ptr<Entity>& other) {
+        for (auto& script : scripts) {
             script->onCollision(other);
         }
     }
 
-    void onCollisionExit(Entity* other) {
-        for (auto script : scripts) {
+    void onCollisionExit(const std::shared_ptr<Entity>& other) {
+        for (auto& script : scripts) {
             script->onCollisionExit(other);
         }
     }
@@ -763,7 +774,7 @@ private:
 class RenderSystem : public System {
 public:
     SDL_Renderer* renderer;
-    std::map<int, std::vector<Entity*>> renderLayers;
+    std::map<int, std::vector<std::shared_ptr<Entity>>> renderLayers;
 
     RenderSystem(bool showColliders = false, int ssaaFactor = 2) :
         renderer(Renderer::Instance().Get()),
@@ -790,10 +801,10 @@ public:
 
 
         for (auto& layer : renderLayers) {
-            for (Entity* entity : layer.second) {
-                TransformComponent* transform = entity->getComponent<TransformComponent>();
-                SpriteComponent* sprite = entity->getComponent<SpriteComponent>();
-                SquareComponent* shape = entity->getComponent<SquareComponent>();
+            for (const auto& entity : layer.second) {
+                auto transform = entity->getComponent<TransformComponent>();
+                auto sprite = entity->getComponent<SpriteComponent>();
+                auto shape = entity->getComponent<SquareComponent>();
                 if (sprite) {
                     SDL_Rect temp = sprite->getWorldSpaceRect();
 
@@ -803,7 +814,7 @@ public:
                         transform->getRotation(), nullptr, sprite->flip);
                     sprite->nextFrame(deltaTime);
                 #ifdef _DEBUG
-                    BoxColliderComponent* boxCollider = entity->getComponent<BoxColliderComponent>();
+                    auto boxCollider = entity->getComponent<BoxColliderComponent>();
                     if (boxCollider && showColliders) {
                         SDL_SetRenderDrawColor(renderer, 173, 216, 230, 255);  // Light blue
 
@@ -820,7 +831,7 @@ public:
                     SDL_RenderCopyEx(renderer, shape->texture, NULL, &temp, rot, NULL,
                         SDL_FLIP_NONE);
                 #ifdef _DEBUG
-                    BoxColliderComponent* boxCollider = 
+                    auto boxCollider = 
                         entity->getComponent<BoxColliderComponent>();
 
                     if (boxCollider && showColliders) {
@@ -848,14 +859,13 @@ public:
         SDL_RenderPresent(renderer);
     }
 
-    void tryAddEntity(Entity* entity) override {
+    void tryAddEntity(std::shared_ptr<Entity> entity) override { // Use shared_ptr
         if (entity->getComponent<TransformComponent>() && (entity->getComponent<SpriteComponent>() || entity->getComponent<SquareComponent>())) {
-            RenderLayerComponent* layerComp = entity->getComponent<RenderLayerComponent>();
+            auto layerComp = entity->getComponent<RenderLayerComponent>();
             if (layerComp) {
                 renderLayers[layerComp->layer].push_back(entity);
             }
             else {
-                // Default to layer 0 if no layer component is present
                 renderLayers[0].push_back(entity);
             }
         }
@@ -866,7 +876,7 @@ private:
     bool showColliders;
 private:
 #ifdef _DEBUG
-    void computeRotatedBox(BoxColliderComponent* box, float rotation, SDL_Point points[5]) {
+    void computeRotatedBox(std::shared_ptr<BoxColliderComponent> box, float rotation, SDL_Point points[5]) {
         SDL_Rect rect = box->getWorldSpaceRect();
         int x = rect.x;
         int y = rect.y;
@@ -947,14 +957,13 @@ private:
 
 class WorldSpaceSystem : public System {
 public:
-    Camera* cam;
+    std::shared_ptr<Camera> cam;
 
-    WorldSpaceSystem(Camera* cam) : cam(cam) {}
+    WorldSpaceSystem(std::shared_ptr<Camera> cam) : cam(cam) {}
 
     void update() {
-        for (auto it = entities.begin(); it != entities.end(); ++it) {
-            Entity* entity = *it;
-            TransformComponent* transform = entity->getComponent<TransformComponent>();
+        for (const auto& entity : entities) {
+            auto transform = entity.lock()->getComponent<TransformComponent>();
             if (transform) {
                 Matrix3x3<float> worldSpace = cam->getTransformMatrix() *
                     transform->getTransformMatrix();
@@ -963,7 +972,7 @@ public:
         }
     }
 
-    void tryAddEntity(Entity* entity) override {
+    void tryAddEntity(std::shared_ptr<Entity> entity) override {
         if (entity->getComponent<TransformComponent>()) {
             entities.push_back(entity);
         }
@@ -980,7 +989,7 @@ public:
         }
     }
 
-    void tryAddEntity(Entity* entity) override {
+    void tryAddEntity(std::shared_ptr<Entity> entity) override {
         if (entity->getComponent<BoxColliderComponent>() && entity->getComponent<PhysicsComponent>()) {
             entities.push_back(entity);
         }
@@ -1024,11 +1033,11 @@ private:
         return { true, mtv };
     }
 
-    void resolveAndRespondToCollision(Entity* entityA, Entity* entityB, OBB obbA, OBB obbB, Vector2f& mtv) {
-        TransformComponent* transformA = entityA->getComponent<TransformComponent>();
-        TransformComponent* transformB = entityB->getComponent<TransformComponent>();
-        PhysicsComponent* physicsA = entityA->getComponent<PhysicsComponent>();
-        PhysicsComponent* physicsB = entityB->getComponent<PhysicsComponent>();
+    void resolveAndRespondToCollision(std::weak_ptr<Entity> entityA, std::weak_ptr<Entity> entityB, OBB obbA, OBB obbB, Vector2f& mtv) {
+        auto transformA = entityA.lock()->getComponent<TransformComponent>();
+        auto transformB = entityB.lock()->getComponent<TransformComponent>();
+        auto physicsA = entityA.lock()->getComponent<PhysicsComponent>();
+        auto physicsB = entityB.lock()->getComponent<PhysicsComponent>();
         if (abs(mtv.x) < 0.01f && mtv.y > 0 && physicsA->velocity.y > 0) {
             physicsA->velocity.y = 0;  // Reset the downward velocity
             physicsA->isGrounded = true;
@@ -1101,12 +1110,12 @@ private:
         }
     }
 
-    void OBBCollision(Entity* entityA, Entity* entityB) {
-        BoxColliderComponent* boxA = entityA->getComponent<BoxColliderComponent>();
-        BoxColliderComponent* boxB = entityB->getComponent<BoxColliderComponent>();
-        
-        ScriptComponent* scriptA = entityA->getComponent<ScriptComponent>();
-        ScriptComponent* scriptB = entityB->getComponent<ScriptComponent>();
+    void OBBCollision(std::weak_ptr<Entity> entityA, std::weak_ptr<Entity> entityB) {
+        auto boxA = entityA.lock()->getComponent<BoxColliderComponent>();
+        auto boxB = entityB.lock()->getComponent<BoxColliderComponent>();
+
+        auto scriptA = entityA.lock()->getComponent<ScriptComponent>();
+        auto scriptB = entityB.lock()->getComponent<ScriptComponent>();
 
         OBB obbA = boxA->getWorldSpaceOBB();
         OBB obbB = boxB->getWorldSpaceOBB();
@@ -1114,31 +1123,26 @@ private:
         auto [isOverlapping, mtv] = checkOBBCollisionAndGetMTV(obbA, obbB);
         if (isOverlapping) {
             if (collisionMatrix.shouldCollide(boxA->getLayer(), boxB->getLayer())) {
-                resolveAndRespondToCollision(entityA, entityB, obbA, obbB, mtv);
-            }          
+                resolveAndRespondToCollision(entityA, entityB, obbA, obbB, mtv); 
+            }
 
-            // Call collision handlers for the scripts
             if (scriptA) {
-                scriptA->onCollision(entityB);
+                scriptA->onCollision(entityB.lock());
             }
             if (scriptB) {
-                scriptB->onCollision(entityA);
+                scriptB->onCollision(entityA.lock());
             }
 
-            currentCollisions.insert({ entityA, entityB });
+            currentCollisions.insert({ entityA.lock().get(), entityB.lock().get() });
         }
         else {
-            // Check if they were colliding in the previous frame
-            if (currentCollisions.count({ entityA, entityB }) > 0) {
-                // Remove from current collisions set
-                currentCollisions.erase({ entityA, entityB });
-
-                // Call onCollisionExit for both entities
+            if (currentCollisions.count({ entityA.lock().get(), entityB.lock().get() }) > 0) {
+                currentCollisions.erase({ entityA.lock().get(), entityB.lock().get() });
                 if (scriptA) {
-                    scriptA->onCollisionExit(entityB);
+                    scriptA->onCollisionExit(entityB.lock());
                 }
                 if (scriptB) {
-                    scriptB->onCollisionExit(entityA);
+                    scriptB->onCollisionExit(entityA.lock());
                 }
             }
         }
@@ -1156,8 +1160,8 @@ public:
     const Vector2f gravity = Vector2f(0, 9.8f);
 
     void update(float deltaTime) {
-        for (Entity* entity : entities) {
-            PhysicsComponent* physics = entity->getComponent<PhysicsComponent>();
+        for (const auto& entity : entities) {
+            auto physics = entity.lock()->getComponent<PhysicsComponent>();
             if (physics && !physics->isStatic) {
                 if (physics->isAffectedByGravity && !physics->isGrounded) {
                     // Apply gravity
@@ -1171,7 +1175,7 @@ public:
                 physics->velocity *= physics->damping;
 
                 // Update position based on velocity
-                TransformComponent* transform = entity->getComponent<TransformComponent>();
+                auto transform = entity.lock()->getComponent<TransformComponent>();
                 if (transform) {
                     Vector2f pos = transform->getPosition();
                     pos += physics->velocity * deltaTime;
@@ -1184,7 +1188,7 @@ public:
         }
     }
 
-    void tryAddEntity(Entity* entity) override {
+    void tryAddEntity(std::shared_ptr<Entity> entity) override {
         if (entity->getComponent<PhysicsComponent>()) {
             entities.push_back(entity);
         }
@@ -1194,8 +1198,8 @@ public:
 class ScriptSystem : public System {
 public:
     void start() {
-        for (Entity* entity : entities) {
-            ScriptComponent* script = entity->getComponent<ScriptComponent>();
+        for (const auto& entity : entities) {
+            auto script = entity.lock()->getComponent<ScriptComponent>();
             if (script) {
                 script->start();
             }
@@ -1203,15 +1207,15 @@ public:
     }
 
     void update(float deltaTime) {
-        for (Entity* entity : entities) {
-            ScriptComponent* script = entity->getComponent<ScriptComponent>();
+        for (const auto& entity : entities) {
+            auto script = entity.lock()->getComponent<ScriptComponent>();
             if (script) {
                 script->update(deltaTime);
             }
         }
     }
 
-    void tryAddEntity(Entity* entity) override {
+    void tryAddEntity(std::shared_ptr<Entity> entity) override {
         if (entity->getComponent<ScriptComponent>()) {
             entities.push_back(entity);
         }

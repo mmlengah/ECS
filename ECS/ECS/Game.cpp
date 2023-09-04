@@ -10,15 +10,15 @@ public:
     BoxMovementScript() : speed(1000.0f), transform(nullptr), physics(nullptr) {}
 
     void start() override {
-        transform = entity->getComponent<TransformComponent>();
-        physics = entity->getComponent<PhysicsComponent>();
+        transform = entity.lock()->getComponent<TransformComponent>();
+        physics = entity.lock()->getComponent<PhysicsComponent>();
     }
 
     void update(float deltaTime) override {
         physics->applyForce(Vector2f(speed, 0.0f) * deltaTime);
     }
 
-    void onCollision(Entity* other) override {
+    void onCollision(const std::shared_ptr<Entity>& other) override {
         speed = 0;
         physics->isAffectedByGravity = true;
     }
@@ -32,8 +32,8 @@ public:
     }
 private:
     float speed;
-    TransformComponent* transform;
-    PhysicsComponent* physics;
+    std::shared_ptr<TransformComponent> transform;
+    std::shared_ptr<PhysicsComponent> physics;
 };
 
 Game::Game() : quit(false), oldTime(0), currentTime(0), deltaTime(0), win(nullptr, SDL_DestroyWindow),
@@ -45,11 +45,6 @@ collisionSystem(nullptr), physicsSystem(nullptr), scriptSystem(nullptr), cam(nul
 
 Game::~Game()
 {
-    delete renderSystem;
-    delete worldSpaceSystem;
-    delete collisionSystem;
-    delete physicsSystem;
-    delete cam;
     SDL_Quit();
 }
 
@@ -68,17 +63,17 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     Renderer::Instance().Initialize(win.get());
 
     //add camera
-    cam = new Camera(Vector2f(0, 0), Vector2f(1, 1), 0, Vector2int(viewPortWidth, viewPortHeight));
+    cam = std::make_shared<Camera>(Vector2f(0.0f, 0.0f), Vector2f(1.0f, 1.0f), 0.0f, Vector2int(viewPortWidth, viewPortHeight));
 
     systemManager = std::make_unique<SystemManager>();
 
-    renderSystem = &(systemManager->registerSystem<RenderSystem>(true));
-    worldSpaceSystem = &(systemManager->registerSystem<WorldSpaceSystem>(cam));
-    collisionSystem = &(systemManager->registerSystem<CollisionSystem>());
-    physicsSystem = &(systemManager->registerSystem<PhysicsSystem>());
-    scriptSystem = &(systemManager->registerSystem<ScriptSystem>());
+    renderSystem = systemManager->registerSystem<RenderSystem>(true);
+    worldSpaceSystem = systemManager->registerSystem<WorldSpaceSystem>(cam);
+    collisionSystem = systemManager->registerSystem<CollisionSystem>();
+    physicsSystem = systemManager->registerSystem<PhysicsSystem>();
+    scriptSystem = systemManager->registerSystem<ScriptSystem>();
 
-    collisionSystem->collisionMatrix.setShouldCollide(Default, Default, false);
+    collisionSystem->collisionMatrix.setShouldCollide(LayerOne, LayerTwo, false);
     
     player = createPlayerPrefab();
 
@@ -99,6 +94,8 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     box2->addComponent<BoxColliderComponent>();
     box2->addComponent<PhysicsComponent>(10.f, true, false);
 
+    box2->getComponent<BoxColliderComponent>()->setLayer(LayerTwo);
+
     auto box3 = Entity::create();
     box3->addComponent<TransformComponent>(Vector2f(0, 460), 0.0f, Vector2f(2.0f, 2.0f));
     box3->addComponent<SquareComponent>(a, white);
@@ -110,7 +107,6 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     box4->addComponent<SquareComponent>(a, white);
     box4->addComponent<BoxColliderComponent>();
     box4->addComponent<PhysicsComponent>(10.f, false, true);
-    box4->getComponent<BoxColliderComponent>()->setLayer(LayerOne);
 
     SDL_Color blue = { 0, 0, 255, 255 };
     auto box5 = Entity::create();
@@ -119,9 +115,9 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     box5->addComponent<BoxColliderComponent>();
     box5->addComponent<PhysicsComponent>(40.f, false);
     box5->addComponent<ScriptComponent>();
-    PhysicsComponent* box5physics = box5->getComponent<PhysicsComponent>();
-    BoxColliderComponent* box5BoxCollider = box5->getComponent<BoxColliderComponent>();
-    ScriptComponent* box5ScriptComponent = box5->getComponent<ScriptComponent>();
+    auto box5physics = box5->getComponent<PhysicsComponent>();
+    auto box5BoxCollider = box5->getComponent<BoxColliderComponent>();
+    auto box5ScriptComponent = box5->getComponent<ScriptComponent>();
 
     box5ScriptComponent->addScript(std::make_shared<BoxMovementScript>());
 
@@ -133,9 +129,9 @@ bool Game::Initialize(const char* windowTitle, int screenWidth, int screenHeight
     box6->addComponent<PhysicsComponent>(10.f, false);
     box6->addComponent<ScriptComponent>();
 
-    PhysicsComponent* box6physics = box6->getComponent<PhysicsComponent>();
-    BoxColliderComponent* box6BoxCollider = box6->getComponent<BoxColliderComponent>();
-    ScriptComponent* box6ScriptComponent = box6->getComponent<ScriptComponent>();
+    auto box6physics = box6->getComponent<PhysicsComponent>();
+    auto box6BoxCollider = box6->getComponent<BoxColliderComponent>();
+    auto box6ScriptComponent = box6->getComponent<ScriptComponent>();
 
     std::shared_ptr<BoxMovementScript> boxMovementScript = std::make_shared<BoxMovementScript>();
     boxMovementScript->setSpeed(-1000.0f);
