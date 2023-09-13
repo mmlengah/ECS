@@ -20,7 +20,8 @@
 
 /*
 TODO:
-Scene Management
+Fix delta time calulation when switching scenes
+Change default windows bar
 Tilemap
 Sound
 Light
@@ -62,6 +63,7 @@ public:
     }
 
     static std::vector<std::shared_ptr<Entity>>& getAllEntities() {
+        std::cout << allEntities.size() << std::endl;
         return allEntities;
     }
 

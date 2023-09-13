@@ -1,8 +1,9 @@
 #pragma once
 #include <SDL.h>
 #include <memory>
+#include "QuitManager.h"
 #include "Camera.h"
-#include "ECS.h"
+
 
 class Game {
 public:
@@ -14,22 +15,10 @@ public:
 
     void Run();
 private:
-    void Update();
-
-    void Render();
-private:
-    bool quit;
-    Uint32 oldTime, currentTime;
-    float deltaTime;
     std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> win;
-    std::unique_ptr<SystemManager> systemManager;
-    std::shared_ptr<RenderSystem> renderSystem;
-    std::shared_ptr<WorldSpaceSystem> worldSpaceSystem;
-    std::shared_ptr<CollisionSystem> collisionSystem;
-    std::shared_ptr<PhysicsSystem> physicsSystem;
-    std::shared_ptr<ScriptSystem> scriptSystem;
+    QuitManager& quitManager;
+
     std::shared_ptr<Camera> cam;
-    std::shared_ptr<Entity> player;
 };
 
 

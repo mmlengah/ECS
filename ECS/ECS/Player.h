@@ -3,6 +3,7 @@
 #include <memory>
 #include "ECS.h"
 #include "PCM.h"
+#include "Scene.h"
 
 using namespace PC;
 
@@ -102,7 +103,10 @@ public:
         sprite = entity.lock()->getComponent<SpriteComponent>();
     }
 
-    void update(float deltaTime) override {        
+    void update(float deltaTime) override {       
+        if (InputSystem::isKeyDown(SDLK_SPACE)) {
+            SceneManager::SwitchScene("LevelTwo");
+        }
         if (InputSystem::isKeyUp(SDLK_w) || InputSystem::isKeyUp(SDLK_s)) {
             velocity->dy = 0;
         }
