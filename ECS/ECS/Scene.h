@@ -3,6 +3,7 @@
 #include <memory>
 #include <map>
 #include "QuitManager.h"
+#include "Timer.h"
 #include "ECS.h"
 
 class Scene {
@@ -28,9 +29,9 @@ private:
     std::string sceneName;
 
     QuitManager& quitManager;
-    Uint32 oldTime, currentTime;
-    float deltaTime;
 
+    float deltaTime;
+    std::unique_ptr<Timer> timer;
     std::unique_ptr<SystemManager> systemManager;
     std::shared_ptr<RenderSystem> renderSystem;
     std::shared_ptr<WorldSpaceSystem> worldSpaceSystem;

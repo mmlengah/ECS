@@ -38,7 +38,7 @@ std::string SceneManager::GetCurrentScene()
 }
 
 Scene::Scene(const std::string& name, std::shared_ptr<Camera> cam) : sceneName(name), cam(std::make_shared<Camera>(*cam)),
-quitManager(QuitManager::getInstance()), oldTime(0), currentTime(0), deltaTime(0.0f), systemManager(nullptr), renderSystem(nullptr),
+quitManager(QuitManager::getInstance()), deltaTime(0.0f), timer(nullptr), systemManager(nullptr), renderSystem(nullptr),
 worldSpaceSystem(nullptr), collisionSystem(nullptr), physicsSystem(nullptr), scriptSystem(nullptr), cameraTarget(nullptr)
 {
 }
@@ -52,6 +52,8 @@ void Scene::Initialize()
     collisionSystem = systemManager->registerSystem<CollisionSystem>();
     physicsSystem = systemManager->registerSystem<PhysicsSystem>();
     scriptSystem = systemManager->registerSystem<ScriptSystem>();
+
+    timer = std::make_unique<Timer>();
 }
 
 
@@ -88,19 +90,12 @@ void Scene::Render()
 
 void Scene::Run()
 {
-    //Initialize();
-    //Load();
-    //RegisterEntities();
-
     SDL_Event event;
 
     scriptSystem->start();
     while (sceneName == SceneManager::GetCurrentScene()) {
 
-        currentTime = SDL_GetTicks();
-        deltaTime = (currentTime - oldTime) / 1000.0f; // convert from milliseconds to seconds
-        std::cout << GetName() << " " << deltaTime << std::endl;
-        oldTime = currentTime;
+        deltaTime = timer->GetDeltaTime();
 
         // Handle events
         while (SDL_PollEvent(&event)) {

@@ -16,6 +16,12 @@
     <Filter Include="PC">
       <UniqueIdentifier>{4d73c0b0-98bc-4dce-83b7-38844df7a802}</UniqueIdentifier>
     </Filter>
+    <Filter Include="EngineH">
+      <UniqueIdentifier>{6a654fa8-ff7e-4c90-a385-b4deeec77797}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EngineCPP">
+      <UniqueIdentifier>{1b579d0a-b197-433b-9223-a8242a438b09}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -25,23 +31,23 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Camera.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Renderer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Scene.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>EngineCPP</Filter>
     </ClCompile>
     <ClCompile Include="QuitManager.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>EngineCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer.cpp">
+      <Filter>EngineCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="Scene.cpp">
+      <Filter>EngineCPP</Filter>
+    </ClCompile>
+    <ClCompile Include="Timer.cpp">
+      <Filter>EngineCPP</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ECS.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="PCM.h">
@@ -53,23 +59,29 @@
     <ClInclude Include="PCTP.h">
       <Filter>PC</Filter>
     </ClInclude>
-    <ClInclude Include="Camera.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Player.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Renderer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Scene.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="LevelOne.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Camera.h">
+      <Filter>EngineH</Filter>
+    </ClInclude>
+    <ClInclude Include="ECS.h">
+      <Filter>EngineH</Filter>
+    </ClInclude>
     <ClInclude Include="QuitManager.h">
-      <Filter>Header Files</Filter>
+      <Filter>EngineH</Filter>
+    </ClInclude>
+    <ClInclude Include="Renderer.h">
+      <Filter>EngineH</Filter>
+    </ClInclude>
+    <ClInclude Include="Scene.h">
+      <Filter>EngineH</Filter>
+    </ClInclude>
+    <ClInclude Include="Timer.h">
+      <Filter>EngineH</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

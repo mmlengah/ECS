@@ -20,7 +20,8 @@
 
 /*
 TODO:
-Fix delta time calulation when switching scenes
+Physics collision rotation
+Responsive ui (Scaling Everything Up)
 Change default windows bar
 Tilemap
 Sound
